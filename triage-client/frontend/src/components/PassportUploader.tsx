@@ -62,7 +62,7 @@ export default function PassportUploader() {
     readS3Bucket();
   }, []);
 
-  //
+  //Listen for complete signal
 
   useEffect(() => {
     const evtSource = new EventSource(
