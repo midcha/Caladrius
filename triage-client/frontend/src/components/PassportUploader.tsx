@@ -62,6 +62,32 @@ export default function PassportUploader() {
     readS3Bucket();
   }, []);
 
+  //
+
+  useEffect(() => {
+    const evtSource = new EventSource(
+      `/api/triage/events?sessionId=${sessionIdRef.current}`
+    );
+
+    evtSource.onmessage = (event) => {
+      console.log("SSE message:", event.data);
+
+      if (event.data === "BUNDLE_READY") {
+        console.log("Bundle ready received, fetching S3...");
+        readS3Bucket();
+      }
+    };
+
+    evtSource.onerror = (err) => {
+      console.error("SSE failed:", err);
+      evtSource.close();
+    };
+
+    return () => {
+      evtSource.close();
+    };
+  }, []);
+
   // const handle = async (e: React.FormEvent) => {
   //   e.preventDefault();
   //   try {
