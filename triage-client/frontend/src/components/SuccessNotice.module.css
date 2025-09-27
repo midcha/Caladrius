@@ -1,6 +1,9 @@
-.box {
+/* Light glass card wrapper */
+.card, .wrap, .box{
   background: var(--panel);
-  border: 1px solid #1e2a3a;
+  backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--panel-border);
   border-radius: var(--radius);
-  padding: 20px;
+  box-shadow: var(--panel-shadow);
+  padding: 24px;
 }

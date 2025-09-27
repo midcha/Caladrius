@@ -1,32 +1,33 @@
-.card {
+/* Vitals Form styles (light glass card, 3-col grid, pill inputs via ui.input) */
+.card{
   background: var(--panel);
-  border: 1px solid #1e2a3a;
+  backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--panel-border);
   border-radius: var(--radius);
-  padding: 20px;
+  box-shadow: var(--panel-shadow);
+  padding: 24px;
+  position: relative;
+  z-index: 1;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+.grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+.actions{ display:flex; gap: 12px; margin-top: 14px; align-items: center; }
+
+/* Input error state overrides */
+.bad{
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 2px rgba(255,77,109,0.18) !important;
 }
 
-.actions { display: flex; gap: 10px; margin-top: 10px; }
-
-.bad {
-  border-color: #5b1f2a !important;
-  outline: 0;
-  box-shadow: 0 0 0 2px rgba(255, 100, 124, 0.15);
-}
-
-.error {
-  color: #ff8da0;
+.error{
+  color: var(--danger);
   font-size: 12px;
   margin-top: 4px;
 }
 
-.hint {
+.hint{
   color: var(--muted);
   font-size: 12px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
