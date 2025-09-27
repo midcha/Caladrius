@@ -18,8 +18,8 @@ const emptyVitals: Vitals = {
 };
 
 export default function VitalsForm() {
-  const { submitVitals, busy } = useTriage();
-  const [v, setV] = useState<Vitals>(emptyVitals);
+  const { updateVitals, patientData, busy } = useTriage();
+  const [v, setV] = useState<Vitals>(patientData.vitals || emptyVitals);
   const [touched, setTouched] = useState<Record<keyof Vitals, boolean>>({
     temperature: false,
     systolic: false,
@@ -34,7 +34,12 @@ export default function VitalsForm() {
   const onChange =
     (k: keyof Vitals) =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      setV((prev) => ({ ...prev, [k]: e.target.value }));
+      const newVitals = { ...v, [k]: e.target.value };
+      setV(newVitals);
+      // Auto-save valid vitals to context
+      if (validateVitals(newVitals).ok) {
+        updateVitals(newVitals);
+      }
     };
 
   const onBlur =
@@ -56,7 +61,7 @@ export default function VitalsForm() {
       });
       return;
     }
-    submitVitals(v);
+    updateVitals(v);
   };
 
   useEffect(() => {}, []);
@@ -123,28 +128,13 @@ export default function VitalsForm() {
         />
       </div>
 
-      <div className={s.actions}>
-        <button
-          className={`${ui.btn} ${ui.primary}`}
-          disabled={busy || !ok}
-          type="submit"
-          aria-disabled={busy || !ok}
-          aria-busy={busy}
-        >
-          {busy ? (
-            <>
-              Saving&nbsp;<Spinner />
-            </>
-          ) : (
-            "Save & Continue"
-          )}
-        </button>
-        {!ok && (
+      {!ok && (
+        <div className={s.actions}>
           <span className={s.hint} aria-live="polite">
-            Please fix the highlighted fields.
+            Please fix the highlighted fields to continue.
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </form>
   );
 }
