@@ -24,7 +24,9 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 
 // ---- API wrappers (adjust paths if your backend differs)
 async function startSession() {
-  return json<{ sessionId: string }>("/triage/session/start", { method: "POST" });
+  return json<{ sessionId: string }>("/triage/session/start", {
+    method: "POST",
+  });
 }
 async function postVitals(sessionId: string, vitals: Vitals) {
   return json<{ ok: true }>(`/triage/${sessionId}/vitals`, {
@@ -86,7 +88,11 @@ export const useTriage = () => {
   return ctx;
 };
 
-export default function TriageProvider({ children }: { children: React.ReactNode }) {
+export default function TriageProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [sessionId, setSessionId] = useState<string>();
   const [phase, setPhase] = useState<TriagePhase>("vitals");
   const [busy, setBusy] = useState(false);
@@ -105,21 +111,19 @@ export default function TriageProvider({ children }: { children: React.ReactNode
     }
   }, [sessionId]);
 
-  const submitVitals = useCallback(
-    async (v: Vitals) => {
-      if (!sessionId) await start();
-      const id = sessionId ?? (await startSession()).sessionId;
-      setSessionId(id);
-      setBusy(true);
-      try {
-        await postVitals(id, v);
-        setPhase("passport");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [sessionId, start]
-  );
+  const submitVitals = useCallback(async (v: Vitals) => {
+    // if (!sessionId) await start();
+    // const id = sessionId ?? (await startSession()).sessionId;
+    // setSessionId(id);
+    // setBusy(true);
+    // try {
+    //   await postVitals(id, v);
+    //   setPhase("passport");
+    // } finally {
+    //   setBusy(false);
+    // }
+    setPhase("passport");
+  }, []);
 
   const submitPassport = useCallback(
     async (dump: unknown) => {
@@ -181,7 +185,9 @@ export default function TriageProvider({ children }: { children: React.ReactNode
         if (answer === null) {
           await postPromptAnswer(sessionId, currentQuestion, { refused: true });
         } else if (typeof answer === "boolean") {
-          await postPromptAnswer(sessionId, currentQuestion, { value: String(answer) });
+          await postPromptAnswer(sessionId, currentQuestion, {
+            value: String(answer),
+          });
         } else {
           await postPromptAnswer(sessionId, currentQuestion, { value: answer });
         }
@@ -206,7 +212,17 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       submitSymptoms,
       answerPrompt,
     }),
-    [sessionId, phase, currentQuestion, busy, start, submitVitals, submitPassport, submitSymptoms, answerPrompt]
+    [
+      sessionId,
+      phase,
+      currentQuestion,
+      busy,
+      start,
+      submitVitals,
+      submitPassport,
+      submitSymptoms,
+      answerPrompt,
+    ]
   );
 
   return <TriageCtx.Provider value={value}>{children}</TriageCtx.Provider>;
