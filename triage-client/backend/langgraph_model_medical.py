@@ -172,7 +172,7 @@ def agent_node(state: State):
             
             elif tool_name == "query_medical_history":
                 # Query medical history records
-                medical_records = state.get('medical_records', '')
+                medical_records = state.get('medical_records')
                 field_path = tool_args.get("field_path", "")
                 criteria = tool_args.get("specific_criteria")
                 

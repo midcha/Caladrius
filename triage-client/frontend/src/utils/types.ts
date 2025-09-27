@@ -30,15 +30,12 @@ export type ApiError = {
 
 export type ApiResponse = BackendQuestion | DiagnosisResult | ApiError;
 
-// Import medical record types
-import type { Patient, MedicalHistory } from '../../public/schema';
-
 // Unified patient data structure
 export type PatientData = {
   vitals?: Vitals;
   passportData?: unknown;
   symptoms: string[];
-  medicalRecords?: string | Patient | MedicalHistory; // Support both legacy string and new JSON formats
+  medicalRecords?: string;
 };
 
 export type TriagePhase =

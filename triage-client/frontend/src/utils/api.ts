@@ -2,15 +2,14 @@
  * Unified API client for the Medical Diagnosis backend
  */
 
-import type { PatientData, ApiResponse, Vitals } from './types';
-import type { Patient, MedicalHistory } from '../../public/schema';
+import type { PatientData, ApiResponse } from './types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
 export interface StartDiagnosisRequest {
   thread_id: string;
   symptoms: string[];
-  medical_records?: string | Patient | MedicalHistory | object;
+  medical_records?: string;
 }
 
 export interface ResumeDiagnosisRequest {
@@ -41,13 +40,13 @@ class MedicalApiClient {
    * Start diagnosis with all patient data in one request
    */
   async startDiagnosis(threadId: string, patientData: PatientData): Promise<ApiResponse> {
-    // Convert patient data to structured JSON format expected by backend
+    // Convert patient data to the format expected by backend
     const medicalRecordsData = this.buildMedicalRecords(patientData);
     
     const request: StartDiagnosisRequest = {
       thread_id: threadId,
       symptoms: patientData.symptoms,
-      medical_records: medicalRecordsData, // Now sending structured JSON instead of string
+      medical_records: medicalRecordsData,
     };
 
     return this.request<ApiResponse>('/start', {
@@ -87,103 +86,35 @@ class MedicalApiClient {
   }
 
   /**
-   * Build comprehensive medical records JSON object from patient data
+   * Build comprehensive medical records string from patient data
    */
-  private buildMedicalRecords(patientData: PatientData): Patient | MedicalHistory | object {
-    // If we already have structured medical records, return them
-    if (patientData.medicalRecords && typeof patientData.medicalRecords === 'object') {
-      return patientData.medicalRecords;
-    }
+  private buildMedicalRecords(patientData: PatientData): string {
+    const records: string[] = [];
 
-    // If we have passport data as structured object, use it
-    if (patientData.passportData && typeof patientData.passportData === 'object') {
-      return patientData.passportData as Patient | MedicalHistory;
-    }
-
-    // Build a structured medical record from available data
-    const medicalRecord: Partial<Patient> = {};
-
-    // Add vitals to the medical history if available
+    // Add vitals information
     if (patientData.vitals) {
       const vitals = patientData.vitals;
-      
-      // Create a basic patient record structure
-      medicalRecord.medicalHistory = {
-        prescriptions: [],
-        imaging: [],
-        labs: [],
-        allergies: [],
-        familyHistory: [],
-        personalHistory: [],
-        insurance: [],
-        surgeries: "",
-        visits: [],
-        notes: [
-          `Vital Signs: Temperature ${vitals.temperature}°, Blood Pressure ${vitals.systolic}/${vitals.diastolic} mmHg, ` +
-          `Heart Rate ${vitals.heartRate} bpm, Respirations ${vitals.respirations}/min, Oxygen Saturation ${vitals.spo2}%`
-        ]
-      };
+      records.push(
+        `Vital Signs: Temperature ${vitals.temperature}°, Blood Pressure ${vitals.systolic}/${vitals.diastolic} mmHg, ` +
+        `Heart Rate ${vitals.heartRate} bpm, Respirations ${vitals.respirations}/min, Oxygen Saturation ${vitals.spo2}%`
+      );
     }
 
-    // Handle string medical records as notes
-    if (patientData.medicalRecords && typeof patientData.medicalRecords === 'string') {
-      if (!medicalRecord.medicalHistory) {
-        medicalRecord.medicalHistory = {
-          prescriptions: [],
-          imaging: [],
-          labs: [],
-          allergies: [],
-          familyHistory: [],
-          personalHistory: [],
-          insurance: [],
-          surgeries: "",
-          visits: [],
-          notes: []
-        };
+    // Add passport/medical history data if available
+    if (patientData.passportData) {
+      if (typeof patientData.passportData === 'string') {
+        records.push(`Medical History: ${patientData.passportData}`);
+      } else {
+        records.push(`Medical History: ${JSON.stringify(patientData.passportData)}`);
       }
-      medicalRecord.medicalHistory.notes.push(patientData.medicalRecords);
     }
 
-    // Handle string passport data as notes
-    if (patientData.passportData && typeof patientData.passportData === 'string') {
-      if (!medicalRecord.medicalHistory) {
-        medicalRecord.medicalHistory = {
-          prescriptions: [],
-          imaging: [],
-          labs: [],
-          allergies: [],
-          familyHistory: [],
-          personalHistory: [],
-          insurance: [],
-          surgeries: "",
-          visits: [],
-          notes: []
-        };
-      }
-      medicalRecord.medicalHistory.notes.push(`Medical History: ${patientData.passportData}`);
+    // Add any additional medical records
+    if (patientData.medicalRecords) {
+      records.push(patientData.medicalRecords);
     }
 
-    // Add symptoms to notes
-    if (patientData.symptoms && patientData.symptoms.length > 0) {
-      if (!medicalRecord.medicalHistory) {
-        medicalRecord.medicalHistory = {
-          prescriptions: [],
-          imaging: [],
-          labs: [],
-          allergies: [],
-          familyHistory: [],
-          personalHistory: [],
-          insurance: [],
-          surgeries: "",
-          visits: [],
-          notes: []
-        };
-      }
-      medicalRecord.medicalHistory.notes.push(`Current Symptoms: ${patientData.symptoms.join(', ')}`);
-    }
-
-    // Return the medical history part if that's all we have, or the full patient record
-    return medicalRecord.medicalHistory || medicalRecord;
+    return records.join('\n\n');
   }
 }
 

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import List, Optional, Union, Dict, Any
+from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 from langgraph_model_medical import build_app
@@ -118,7 +118,7 @@ def read_root():
 class StartRequest(BaseModel):
     thread_id: str
     symptoms: List[str]
-    medical_records: Optional[Union[str, Dict[str, Any]]] = None
+    medical_records: Optional[str] = None
 
 class ResumeRequest(BaseModel):
     thread_id: str

@@ -1,4 +1,4 @@
-export type Patient = {
+type Patient = {
   firstName: string;
   lastName: string;
   sex: string;
@@ -8,7 +8,7 @@ export type Patient = {
   medicalHistory: MedicalHistory;
 };
 
-export type MedicalHistory = {
+type MedicalHistory = {
   prescriptions: Prescription[];
   imaging: Imaging[];
   labs?: LabResult[];
@@ -21,13 +21,13 @@ export type MedicalHistory = {
   notes: string[];
 };
 
-export type Visit = {
+type Visit = {
   date: string;
   reason: string;
   notes: string;
 };
 
-export type Allergy = {
+type Allergy = {
   name: string;
   reaction: string;
   severity: string;
@@ -35,14 +35,14 @@ export type Allergy = {
   notes: string;
 };
 
-export type FamilyInfo = {
+type FamilyInfo = {
   condition: string;
   category: string;
   relation: string;
   diagnosisAge: string;
 };
 
-export type PersonalInfo = {
+type PersonalInfo = {
   occupation: string;
   livingSituation: string;
   substanceUsage: string;
@@ -71,14 +71,14 @@ type ChronicConditions = {
   notes: string;
 };
 
-export type Prescription = {
+type Prescription = {
   medication: Medication[];
   instructions: String;
   startDate: string;
   endDate: string;
 };
 
-export type Imaging = {
+type Imaging = {
   type: "MRI" | "CT" | "XRay" | "Ultrasound" | "PET" | "Other";
   bodyRegion: string;
   studyDate: string;
@@ -100,14 +100,14 @@ type ImagingFile = {
   uploadedAt: string;
 };
 
-export type LabResult = {
+type LabResult = {
   testName: string;
   result: string;
   referenceRange: string;
   testDate: string;
 };
 
-export type Medication = {
+type Medication = {
   name: string;
   dosageForm: string;
   strength: string;
