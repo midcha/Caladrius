@@ -107,7 +107,7 @@ def agent_node(state: State):
     coverage_guidance += "NEXT QUESTION PRIORITY: Ask about one of the missing areas above."
     
     # Determine if we should ask more questions or proceed to diagnosis
-    max_questions = 10  # Allow for more thorough information gathering
+    max_questions = 3  # Allow for more thorough information gathering
     should_continue_questioning = len(questions_asked) < max_questions
     
     messages = [
@@ -303,9 +303,12 @@ def final_output_node(state: State):
             "    }\n"
             "  ],\n"
             "  \"clinical_summary\": \"Overall assessment and recommendations\",\n"
-            "  \"urgency_level\": \"low|moderate|high|emergency\",\n"
+            "  \"urgency_level\": 1,\n"
+            "  \"urgency_level_text\": \"Emergency|High|Moderate|Low|Routine\",\n"
             "  \"disclaimer\": \"This is for educational/research purposes only. Not a substitute for professional medical advice. Patient should consult healthcare provider for proper evaluation.\"\n"
             "}\n\n"
+            "IMPORTANT: Set 'urgency_level' as an INTEGER triage priority from 1 to 5 where 1=Emergency/Immediate, 2=High/Urgent, 3=Moderate, 4=Low, 5=Routine/Non-urgent.\n"
+            "Include 'urgency_level_text' as a human-readable label matching the numeric level.\n\n"
             "Consider:\n"
             "- Most common conditions first (common things are common)\n"
             "- Age, gender, and risk factors\n"
@@ -352,6 +355,62 @@ Please provide your differential diagnosis with the top 5 most likely conditions
     if not diagnosis_text:
         # Fallback to stringifying whatever we got, or default message
         diagnosis_text = str(raw_content) if raw_content is not None else "Unable to generate diagnosis."
+
+    # Normalize urgency to numeric if model didn't strictly follow schema
+    try:
+        payload = json.loads(diagnosis_text)
+
+        def map_urgency_to_level(urgency_value) -> int:
+            # Already numeric and in range
+            if isinstance(urgency_value, (int, float)):
+                lvl = int(urgency_value)
+                if 1 <= lvl <= 5:
+                    return lvl
+            # Map strings to numeric
+            if isinstance(urgency_value, str):
+                w = urgency_value.strip().lower()
+                if w in {"emergency", "critical", "immediate", "life-threatening"}:
+                    return 1
+                if w in {"high", "urgent", "very high"}:
+                    return 2
+                if w in {"moderate", "medium"}:
+                    return 3
+                if w in {"low", "minor"}:
+                    return 4
+                if w in {"routine", "non-urgent", "nonurgent"}:
+                    return 5
+            # Default
+            return 3
+
+        # Ensure 'urgency_level' numeric and 'urgency_level_text' coherent
+        if isinstance(payload, dict):
+            numeric = None
+            if "urgency_level" in payload:
+                numeric = map_urgency_to_level(payload.get("urgency_level"))
+            elif "urgency" in payload:
+                numeric = map_urgency_to_level(payload.get("urgency"))
+            elif "urgency_level_text" in payload:
+                numeric = map_urgency_to_level(payload.get("urgency_level_text"))
+            else:
+                numeric = 3
+
+            payload["urgency_level"] = int(numeric)
+
+            # Keep/update a consistent text label
+            text_map = {
+                1: "Emergency",
+                2: "High",
+                3: "Moderate",
+                4: "Low",
+                5: "Routine",
+            }
+            payload["urgency_level_text"] = text_map.get(int(numeric), "Moderate")
+
+            # Re-serialize
+            diagnosis_text = json.dumps(payload)
+    except Exception:
+        # If parsing fails, return raw text
+        pass
 
     return {"diagnosis": diagnosis_text}
 

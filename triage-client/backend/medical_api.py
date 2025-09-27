@@ -5,6 +5,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 from langgraph_model_medical import build_app
 import json
+import os
+from pathlib import Path
+import dotenv
+
+dotenv.load_dotenv()
+
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
 
 app = FastAPI(
     title="Medical Diagnosis API",
@@ -24,6 +32,77 @@ graph = build_app()
 
 # Sentinel token used by frontend to indicate the user skipped a question
 SKIP_TOKEN = "__skip__"
+
+
+# --- MongoDB helpers ---
+_mongo_client: Optional[MongoClient] = None
+
+def _get_mongo_client() -> Optional[MongoClient]:
+    global _mongo_client
+    if _mongo_client is not None:
+        return _mongo_client
+    uri = os.getenv("TRIAGE_MONGO_URI") or os.getenv("MONGO_URI")
+    if not uri:
+        print("[triage-client] No TRIAGE_MONGO_URI/MONGO_URI configured; skipping DB writes.")
+        return None
+    try:
+        print("[triage-client] Found Mongo URI in environment.")
+        _mongo_client = MongoClient(uri, server_api=ServerApi("1"))
+        return _mongo_client
+    except Exception:
+        print("[triage-client] Failed to initialize MongoClient; DB writes disabled.")
+        return None
+
+def _map_urgency_to_level(urgency_value) -> int:
+    if isinstance(urgency_value, (int, float)):
+        lvl = int(urgency_value)
+        if 1 <= lvl <= 5:
+            return lvl
+    if isinstance(urgency_value, str):
+        w = urgency_value.strip().lower()
+        if w in {"emergency", "critical", "immediate", "life-threatening"}:
+            return 1
+        if w in {"high", "urgent", "very high"}:
+            return 2
+        if w in {"moderate", "medium"}:
+            return 3
+        if w in {"low", "minor"}:
+            return 4
+        if w in {"routine", "non-urgent", "nonurgent"}:
+            return 5
+    return 3
+
+def _push_patient_record(thread_id: str, state_values: dict, diagnosis_payload: dict):
+    client = _get_mongo_client()
+    if not client:
+        return  # silently skip if no DB configured
+    db_name = os.getenv("TRIAGE_DB_NAME", "test")
+    coll_name = os.getenv("TRIAGE_COLLECTION", "patients")
+
+    try:
+        db = client[db_name]
+        coll = db[coll_name]
+        print(f"[triage-client] Using MongoDB {db_name}.{coll_name}")
+        symptoms = state_values.get("symptoms", []) or []
+        symptoms_str = ", ".join(symptoms) if isinstance(symptoms, list) else str(symptoms)
+
+        urgency_numeric = _map_urgency_to_level(
+            (diagnosis_payload or {}).get("urgency_level") or (diagnosis_payload or {}).get("urgency")
+        )
+
+        doc = {
+            "name": thread_id,  # using thread_id as a placeholder name
+            "symptoms": symptoms_str,
+            "level": int(urgency_numeric),
+            "priority": int(urgency_numeric),
+        }
+        res = coll.insert_one(doc)
+        print(f"[triage-client] Inserted patient doc into {db_name}.{coll_name} _id={res.inserted_id}")
+    except Exception:
+        # avoid raising; API response should not fail due to DB insert
+        import traceback
+        print("[triage-client] Error inserting patient doc:")
+        traceback.print_exc()
 
 
 @app.get("/")
@@ -105,7 +184,16 @@ def start_diagnosis(req: StartRequest):
     
     try:
         result = graph.invoke(initial_state, config=config)
-        return serialize_result(result)
+        payload = serialize_result(result)
+        # If immediate final diagnosis (unlikely), push to DB synchronously
+        if payload.get("type") == "diagnosis":
+            try:
+                diagnosis_payload = payload.get("diagnosis") if isinstance(payload.get("diagnosis"), dict) else {}
+                state = graph.get_state(config)
+                _push_patient_record(req.thread_id, state.values or {}, diagnosis_payload)
+            except Exception:
+                pass
+        return payload
     except Exception as e:
         return {
             "type": "error",
@@ -145,7 +233,17 @@ def resume_diagnosis(req: ResumeRequest):
             Command(resume=recorded_response, update=update_payload),
             config=config,
         )
-        return serialize_result(result)
+        payload = serialize_result(result)
+        # On final diagnosis, push to MongoDB synchronously
+        if payload.get("type") == "diagnosis":
+            try:
+                diagnosis_payload = payload.get("diagnosis") if isinstance(payload.get("diagnosis"), dict) else {}
+                # Get the latest state to capture final symptoms list
+                latest_state = graph.get_state(config)
+                _push_patient_record(req.thread_id, latest_state.values or {}, diagnosis_payload)
+            except Exception:
+                pass
+        return payload
     except Exception as e:
         return {
             "type": "error",

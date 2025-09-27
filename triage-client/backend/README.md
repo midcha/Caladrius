@@ -108,7 +108,8 @@ Continue a diagnosis session by answering a question.
       }
     ],
     "clinical_summary": "High suspicion for acute coronary syndrome",
-    "urgency_level": "emergency",
+    "urgency_level": 1,
+    "urgency_level_text": "Emergency",
     "disclaimer": "This is for educational purposes only..."
   },
   "status": "completed"

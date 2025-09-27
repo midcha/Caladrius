@@ -174,7 +174,15 @@ def run_interactive_diagnosis(thread_id: str, max_questions: int = 6):
                     print()
                 
                 print(f"Clinical Summary: {diagnosis.get('clinical_summary', 'N/A')}")
-                print(f"Urgency Level: {diagnosis.get('urgency_level', 'N/A').upper()}")
+                urg = diagnosis.get('urgency_level', 'N/A')
+                urg_text = diagnosis.get('urgency_level_text')
+                if isinstance(urg, int):
+                    if urg_text:
+                        print(f"Urgency Level: {urg} ({urg_text})")
+                    else:
+                        print(f"Urgency Level: {urg}")
+                else:
+                    print(f"Urgency Level: {str(urg)}")
                 
             else:
                 print("Raw diagnosis output:")
