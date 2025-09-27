@@ -11,6 +11,7 @@ export type Vitals = {
 export type BackendQuestion = {
   query: string;
   options?: Record<string, string>;
+  question_type?: 'multiple_choice' | 'open_ended' | 'select_multiple';
   type: 'question';
   status: 'waiting_for_response';
 };
