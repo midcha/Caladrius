@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTriage } from "./TriageProvider";
 import ui from "./ui.module.css";
 import s from "./PassportUploader.module.css";
 import Spinner from "./Spinner";
+import QRCode from "react-qr-code";
 
 export default function PassportUploader() {
   const { submitPassport, busy } = useTriage();
@@ -12,46 +13,74 @@ export default function PassportUploader() {
     '{\n  "allergies": ["penicillin"],\n  "medications": [],\n  "conditions": []\n}'
   );
 
-  const handle = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const json = JSON.parse(text);
-      await submitPassport(json);
-    } catch {
-      alert("Invalid JSON");
+  const sessionIdRef = useRef<string>(crypto.randomUUID()); //Hardcoded till i ask about context
+  const [timeLeft, setTimeLeft] = useState<number>(30);
+  const [otp, setOtp] = useState<{
+    sessionId: string;
+    address: string;
+    time: number;
+  }>();
+
+  useEffect(() => {
+    if (!sessionIdRef.current) return;
+
+    async function fetchOtp() {
+      try {
+        // Need to get otp secret from backend, for now lets just hardcode
+        // const res = await fetch(`/triage/${sessionId}`);
+        // const data = await res.json();
+        setOtp({
+          sessionId: sessionIdRef.current,
+          address: window.location.origin,
+          time: Date.now(),
+        });
+        setTimeLeft(30);
+      } catch (err) {
+        console.error("Failed to fetch OTP:", err);
+      }
     }
-  };
+
+    fetchOtp();
+    const interval = setInterval(fetchOtp, 30000);
+    return () => clearInterval(interval);
+  }, [sessionIdRef]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // const handle = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   try {
+  //     const json = JSON.parse(text);
+  //     await submitPassport(json);
+  //   } catch {
+  //     alert("Invalid JSON");
+  //   }
+  // };
 
   return (
-    <form onSubmit={handle} className={s.card}>
+    <div className={s.card} style={{ textAlign: "center" }}>
       <p className={ui.kicker}>Step 2</p>
-      <h2 className={ui.title}>Attach medical passport (JSON)</h2>
+      <h2 className={ui.title}>Scan QR with phone</h2>
       <p className={ui.sub}>
-        Placeholder for phone plug-in middleware. Paste or drop JSON.
+        Scan this QR in the phone app to start the secure upload. It refreshes
+        every 30 seconds.
       </p>
-      <textarea
-        className={`${ui.input} ${ui.textarea}`}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-      />
-      <div style={{ display: "flex", gap: 10 }}>
-        <button className={`${ui.btn} ${ui.primary}`} disabled={busy} type="submit">
-          {busy ? (
-            <>
-              Uploading&nbsp;<Spinner />
-            </>
-          ) : (
-            "Upload & Continue"
-          )}
-        </button>
-        <button
-          className={`${ui.btn} ${ui.ghost}`}
-          type="button"
-          onClick={() => setText("{}")}
-        >
-          Clear
-        </button>
-      </div>
-    </form>
+
+      {otp ? (
+        <>
+          <QRCode value={JSON.stringify(otp)} size={200} />
+          <div style={{ marginTop: "0.5rem", fontSize: "0.9rem" }}>
+            QR expires in: {timeLeft}s
+          </div>
+        </>
+      ) : (
+        <p>Generating QR...</p>
+      )}
+    </div>
   );
 }
