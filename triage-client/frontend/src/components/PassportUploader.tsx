@@ -52,6 +52,16 @@ export default function PassportUploader() {
     return () => clearInterval(timer);
   }, []);
 
+  const readS3Bucket = async () => {
+    const res = await fetch("/api/triage/read");
+    const data = await res.json();
+    console.log(data.json);
+    console.log(data.images);
+  };
+  useEffect(() => {
+    readS3Bucket();
+  }, []);
+
   // const handle = async (e: React.FormEvent) => {
   //   e.preventDefault();
   //   try {
