@@ -4,9 +4,29 @@
   border-radius: var(--radius);
   padding: 20px;
 }
+
 .grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
+
 .actions { display: flex; gap: 10px; margin-top: 10px; }
+
+.bad {
+  border-color: #5b1f2a !important;
+  outline: 0;
+  box-shadow: 0 0 0 2px rgba(255, 100, 124, 0.15);
+}
+
+.error {
+  color: #ff8da0;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
