@@ -1,0 +1,23 @@
+2025-09-27T22:22:38.190Z	partial	OK, just, just type
+2025-09-27T22:22:39.126Z	final	OK, just, just type it out. Difficulty breathing
+2025-09-27T22:22:42.168Z	partial	Yeah, difficulty breathing
+2025-09-27T22:22:42.587Z	final	Yeah, difficulty breathing, then do like
+2025-09-27T22:22:46.156Z	partial	um, pale diap
+2025-09-27T22:22:47.414Z	partial	um, pale diaptic skin.
+2025-09-27T22:22:48.195Z	final	um, pale diaptic skin. Like he wouldn't say that though, right?
+2025-09-27T22:22:51.805Z	partial	Yeah, so like
+2025-09-27T22:22:53.144Z	partial	Yeah, so like s
+2025-09-27T22:22:54.324Z	partial	Yeah, so like like, like do it from the patient
+2025-09-27T22:22:55.610Z	partial	Yeah, so like like, like do it from the patient perspective of the sy
+2025-09-27T22:22:56.879Z	partial	Yeah, so like like, like do it from the patient perspective of the sy what are they, what would they be saying
+2025-09-27T22:22:57.894Z	final	Yeah, so like like, like do it from the patient perspective of the sy what are they, what would they be saying? Well, that the nurse would be saying anything.
+2025-09-27T22:23:00.564Z	partial	sweaty
+2025-09-27T22:23:01.821Z	final	sweaty, hard to breathe
+2025-09-27T22:23:04.289Z	final	and then he's like an outlier as well
+2025-09-27T22:23:08.036Z	partial	You say hard to breathe as well
+2025-09-27T22:23:08.812Z	final	You say hard to breathe as well outlier
+2025-09-27T22:23:12.027Z	final	Cold feet.
+2025-09-27T22:23:14.505Z	final	OK, is that good?
+2025-09-27T22:23:19.217Z	partial	for now? OK.
+2025-09-27T22:23:19.462Z	final	for now? OK, yeah.
+2025-09-27T22:23:21.062Z	final	Start the assessment.
