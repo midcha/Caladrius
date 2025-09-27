@@ -83,8 +83,7 @@ def agent_node(state: State):
             f"{medical_context}\n"
             f"{questions_context}\n\n"
             "HOW TO ASK QUESTIONS:\n"
-            "- Use simple, everyday language that anyone can understand\n"
-            "- ALWAYS provide multiple choice options whenever possible\n"
+            "- provide multiple choice options whenever possible\n"
             "- Make options clear and easy to choose from\n"
             "- Avoid medical jargon - use words patients know\n"
             "- Ask about: when it started, how bad it is, what makes it better/worse\n"
@@ -92,7 +91,7 @@ def agent_node(state: State):
             "- Consider unusual questions that might reveal important clues\n"
             "- Examples: recent travel, work environment, stress, diet changes, sleep patterns\n\n"
             "QUESTION GUIDELINES:\n"
-            "- Always offer 2-6 clear answer choices\n"
+            "- If options are necessary, offer 2-6 clear answer choices\n"
             "- Use simple words instead of medical terms\n"
             "- Make questions specific but easy to understand\n"
             "- Include ranges like 'mild/moderate/severe' or time periods\n"
@@ -101,7 +100,6 @@ def agent_node(state: State):
             f"- Questions asked so far: {len(questions_asked)}/{max_questions}\n"
             f"- If you need more information AND haven't reached question limit: use ask_user_for_input\n"
             f"- If you have enough information OR reached question limit: respond 'READY_FOR_DIAGNOSIS'\n\n"
-            "IMPORTANT: Always provide answer options in your questions. Make them simple and clear. "
             "Use everyday language, not medical terms. Be helpful and caring in your tone."
         )),
         HumanMessage(content=f"Patient presents with: {symptoms_str}")
