@@ -15,6 +15,7 @@ export interface StartDiagnosisRequest {
 export interface ResumeDiagnosisRequest {
   thread_id: string;
   response: string;
+  question?: string;
 }
 
 class MedicalApiClient {
@@ -57,10 +58,11 @@ class MedicalApiClient {
   /**
    * Resume diagnosis with a response to a question
    */
-  async resumeDiagnosis(threadId: string, response: string): Promise<ApiResponse> {
+  async resumeDiagnosis(threadId: string, response: string, question?: string): Promise<ApiResponse> {
     const request: ResumeDiagnosisRequest = {
       thread_id: threadId,
       response: response,
+      question,
     };
 
     return this.request<ApiResponse>('/resume', {

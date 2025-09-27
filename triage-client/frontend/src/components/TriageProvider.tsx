@@ -183,7 +183,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
 
     setBusy(true);
     try {
-      const response = await medicalApi.resumeDiagnosis(sessionId, answer);
+      const response = await medicalApi.resumeDiagnosis(sessionId, answer, currentQuestion.query);
       
       if (response.type === 'question') {
         setCurrentQuestion(response);
