@@ -60,7 +60,8 @@ def agent_node(state: State):
     # Initialize ChatOpenAI with tools bound
     model = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        temperature=0
+        temperature=0,
+        reasoning={"effort": "low"},
     ).bind_tools(tools)
     
     # Build the diagnostic context
@@ -68,38 +69,151 @@ def agent_node(state: State):
     medical_context = f"Medical Records: {medical_records or 'No medical history provided'}"
     questions_context = f"Previous Questions Asked: {len(questions_asked)}"
     
+    # Analyze what areas have been covered based on previous questions
+    covered_areas = []
+    timing_questions = ["when", "started", "how long", "duration", "time"]
+    severity_questions = ["severe", "pain scale", "rate", "intensity", "bad"]
+    quality_questions = ["feel like", "describe", "type of", "kind of", "sensation"]
+    trigger_questions = ["better", "worse", "trigger", "cause", "aggravate", "relieve"]
+    associated_questions = ["other symptoms", "anything else", "along with", "together"]
+    context_questions = ["doing when", "started when", "recent", "changes", "circumstances"]
+    history_questions = ["before", "family", "medication", "medical history", "past"]
+    
+    all_questions_text = " ".join(questions_asked).lower()
+    
+    if any(word in all_questions_text for word in timing_questions):
+        covered_areas.append("timing")
+    if any(word in all_questions_text for word in severity_questions):
+        covered_areas.append("severity") 
+    if any(word in all_questions_text for word in quality_questions):
+        covered_areas.append("quality")
+    if any(word in all_questions_text for word in trigger_questions):
+        covered_areas.append("triggers")
+    if any(word in all_questions_text for word in associated_questions):
+        covered_areas.append("associated_symptoms")
+    if any(word in all_questions_text for word in context_questions):
+        covered_areas.append("context")
+    if any(word in all_questions_text for word in history_questions):
+        covered_areas.append("history")
+    
+    missing_areas = []
+    all_areas = ["quality", "triggers", "associated_symptoms", "context", "history"]
+    for area in all_areas:
+        if area not in covered_areas:
+            missing_areas.append(area)
+    
+    coverage_guidance = f"Areas covered: {', '.join(covered_areas) if covered_areas else 'None'}\n"
+    coverage_guidance += f"MISSING CRITICAL AREAS: {', '.join(missing_areas) if missing_areas else 'All covered'}\n"
+    coverage_guidance += "NEXT QUESTION PRIORITY: Ask about one of the missing areas above."
+    
     # Determine if we should ask more questions or proceed to diagnosis
-    max_questions = 5  # Limit to prevent infinite questioning
+    max_questions = 3  # Allow for more thorough information gathering
     should_continue_questioning = len(questions_asked) < max_questions
     
     messages = [
         SystemMessage(content=(
-            "You are a friendly medical assistant helping to understand a patient's symptoms. Your role is to:\n"
-            "1. Look at what the patient is feeling and their health history\n"
-            "2. Ask ONE simple, clear question to learn more\n"
-            "3. Keep asking until you have enough information to help\n\n"
+            "You are a thorough medical assistant helping to understand a patient's symptoms. Your role is to:\n"
+            "1. Gather comprehensive information about the patient's condition\n"
+            "2. Ask ONE thoughtful, strategic question at a time\n"
+            "3. Continue questioning until you have enough information for accurate diagnosis\n\n"
             "CURRENT SITUATION:\n"
             f"What the patient is experiencing: {symptoms_str}\n"
             f"{medical_context}\n"
             f"{questions_context}\n\n"
-            "HOW TO ASK QUESTIONS:\n"
-            "- provide multiple choice options whenever possible\n"
-            "- Make options clear and easy to choose from\n"
-            "- Avoid medical jargon - use words patients know\n"
-            "- Ask about: when it started, how bad it is, what makes it better/worse\n"
-            "- Ask about related symptoms, medications, family health history\n"
-            "- Consider unusual questions that might reveal important clues\n"
-            "- Examples: recent travel, work environment, stress, diet changes, sleep patterns\n\n"
-            "QUESTION GUIDELINES:\n"
-            "- If options are necessary, offer 2-6 clear answer choices\n"
-            "- Use simple words instead of medical terms\n"
-            "- Make questions specific but easy to understand\n"
-            "- Include ranges like 'mild/moderate/severe' or time periods\n"
-            "- Offer 'other' or 'none of these' as an option when appropriate\n\n"
+            f"COVERAGE ANALYSIS:\n"
+            f"{coverage_guidance}\n\n"
+            "MANDATORY QUESTION AREAS - You MUST ask about ALL of these systematically:\n"
+            "\n"
+            "1. TIMING (if not covered): When did symptoms start? How long do they last? Any pattern?\n"
+            "2. SEVERITY (if not covered): Rate 1-10? Interfering with activities? Getting worse/better?\n"
+            "3. QUALITY (ALWAYS ask): What does it feel like? Sharp/dull/throbbing/burning/pressure?\n"
+            "4. LOCATION (ALWAYS ask): Exactly where? Does it spread anywhere?\n"
+            "5. TRIGGERS (CRITICAL): What makes it better or worse? Food, position, activity, rest?\n"
+            "6. ASSOCIATED SYMPTOMS (CRITICAL): Any other symptoms happening at the same time?\n"
+            "7. CONTEXT (CRITICAL): What were you doing when it started? Any recent changes?\n"
+            "8. MEDICAL HISTORY (CRITICAL): Ever had this before? Family history? Current medications?\n"
+            "9. FUNCTIONAL IMPACT: How is this affecting your daily life, sleep, work?\n"
+            "\n"
+            "QUESTIONING SEQUENCE: After basic timing/severity, IMMEDIATELY move to quality, triggers, associated symptoms, and context.\n"
+            "DO NOT get stuck on just timing and severity questions - branch out to explore other diagnostic areas.\n\n"
+            "QUESTION TYPES - Mix these for comprehensive assessment:\n"
+            "\n"
+            "EXAMPLE QUESTIONS BY CATEGORY:\n"
+            "\n"
+            "QUALITY/DESCRIPTION (open_ended):\n"
+            "- 'Can you describe exactly what this pain feels like?'\n"
+            "- 'What words would you use to describe the sensation?'\n"
+            "\n"
+            "TRIGGERS/PATTERNS (open_ended):\n"
+            "- 'What makes this better or worse?'\n"
+            "- 'Have you noticed anything that seems to trigger it?'\n"
+            "- 'Does changing position, eating, or resting affect it?'\n"
+            "\n"
+            "ASSOCIATED SYMPTOMS (open_ended):\n"
+            "- 'Are you experiencing any other symptoms along with this?'\n"
+            "- 'Have you noticed anything else unusual happening in your body?'\n"
+            "\n"
+            "CONTEXT/CIRCUMSTANCES (open_ended):\n"
+            "- 'What were you doing when this first started?'\n"
+            "- 'Has anything changed in your life recently - diet, stress, medications, activities?'\n"
+            "- 'Tell me about the day this began.'\n"
+            "\n"
+            "MEDICAL HISTORY (multiple_choice + open_ended):\n"
+            "- 'Have you ever experienced anything like this before?' (Yes/No/Not sure)\n"
+            "- 'What medications are you currently taking?' (open_ended)\n"
+            "- 'Does anyone in your family have similar health issues?' (open_ended)\n"
+            "\n"
+            "MANDATORY: After 2 basic questions (timing/severity), you MUST ask about triggers, associated symptoms, or context.\n\n"
+            "LANGUAGE GUIDELINES:\n"
+            "- Use simple, everyday words instead of medical terms\n"
+            "- Be conversational and empathetic\n"
+            "- For multiple choice: include 'other' or 'not sure' options\n"
+            "- For open questions: encourage detailed, personal descriptions\n\n"
             f"PROGRESS CHECK:\n"
             f"- Questions asked so far: {len(questions_asked)}/{max_questions}\n"
-            f"- If you need more information AND haven't reached question limit: use ask_user_for_input\n"
-            f"- If you have enough information OR reached question limit: respond 'READY_FOR_DIAGNOSIS'\n\n"
+            f"- REQUIRED MINIMUM: You MUST ask at least 5 questions before responding 'READY_FOR_DIAGNOSIS'.\n"
+            f"- IDENTIFY which critical areas are still missing from the conversation\n"
+            f"- REQUIRED COVERAGE: You must have asked about timing, severity, quality, location, and at least 2 of: triggers, associated symptoms, context, medical history, functional impact.\n"
+            f"- Do not respond 'READY_FOR_DIAGNOSIS' before both conditions are met, even if you think you have enough information.\n\n"
+            f"AREA COVERAGE CHECK - Look at previous Q&A and identify what's missing:\n"
+            f"□ Basic timing and severity (usually covered first)\n"
+            f"□ Quality/description of symptoms (what does it feel like?)\n"
+            f"□ Triggers and modifying factors (what makes it better/worse?)\n"
+            f"□ Associated symptoms (other symptoms happening together?)\n"
+            f"□ Context and circumstances (what was happening when it started?)\n"
+            f"□ Medical history and medications (past episodes, current meds?)\n"
+            f"□ Functional impact (how affecting daily life?)\n\n"
+            f"INFORMATION COMPLETENESS CHECKLIST:\n"
+            f"CRITICAL (must have for diagnosis):\n"
+            f"  ✓ TIMING: When did symptoms start? How long have they lasted?\n"
+            f"  ✓ SEVERITY: How intense/severe are the symptoms? Impact on daily life?\n"
+            f"  ✓ CHARACTER: What do the symptoms feel like? (quality, description)\n"
+            f"  ✓ LOCATION: Where exactly are the symptoms? Do they spread?\n"
+            f"\n"
+            f"IMPORTANT (should have for accurate diagnosis):\n"
+            f"  ✓ TRIGGERS: What makes symptoms better or worse?\n"
+            f"  ✓ ASSOCIATED: Any other symptoms happening at the same time?\n"
+            f"  ✓ CONTEXT: What was happening when symptoms started? Recent changes?\n"
+            f"  ✓ HISTORY: Similar episodes before? Family history? Current medications?\n"
+            f"\n"
+            f"DECISION FRAMEWORK:\n"
+            f"- If you need more specific information about symptoms: use ask_user_for_input tool\n"
+            f"- If you have gathered comprehensive diagnostic information: respond 'READY_FOR_DIAGNOSIS'\n"
+            f"- Aim to ask 4-8 thoughtful questions covering different diagnostic areas\n"
+            f"- Don't ask too many similar questions - diversify your inquiry\n\n"
+            f"QUESTIONING GUIDELINES:\n"
+            f"1. Start with basic timing and severity if not clear\n"
+            f"2. Then explore quality, triggers, associated symptoms, context\n"
+            f"3. Include medical history and functional impact\n"
+            f"4. Use both open-ended and multiple choice questions\n"
+            f"5. Stop when you have enough information for differential diagnosis\n\n"
+            f"NEXT ACTION:\n"
+            f"- Review the missing areas above and the previous conversation\n"
+            f"- If important diagnostic information is still missing OR minimum question count not reached: use ask_user_for_input\n"
+            f"- Only respond 'READY_FOR_DIAGNOSIS' when:\n"
+            f"  1. Minimum number of questions (5) has been asked\n"
+            f"  2. Sufficient coverage of critical diagnostic areas has been achieved\n"
+            "- Focus on asking thoughtful questions, not rushing to diagnosis"
             "Use everyday language, not medical terms. Be helpful and caring in your tone."
         )),
         HumanMessage(content=f"Patient presents with: {symptoms_str}")
@@ -131,12 +245,13 @@ def agent_node(state: State):
                 params = {
                     "query": question,
                     "options": tool_args.get("options"),
+                    "question_type": tool_args.get("question_type", "multiple_choice")
                 }
                 
                 # Update state and return the interrupt
                 return ask_user_for_input.invoke(params)
     
-    # No more questions needed or limit reached, proceed to diagnosis
+    # No tool calls - proceed to diagnosis only if we have enough information
     return Command(goto="final_output")
 
 
@@ -147,7 +262,8 @@ def final_output_node(state: State):
     # Initialize ChatOpenAI
     model = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.3"))  # Lower temp for medical accuracy
+        temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.3")),  # Lower temp for medical accuracy
+        reasoning={"effort": "medium"},
     )
     
     # Extract medical context from state
@@ -212,10 +328,32 @@ Please provide your differential diagnosis with the top 5 most likely conditions
 
     # Call the model for diagnosis
     response = model.invoke(messages)
-    
-    diagnosis_content = response.content if response.content else "Unable to generate diagnosis."
-    
-    return {"diagnosis": diagnosis_content}
+
+    # Extract text content: some providers return structured content blocks
+    raw_content = getattr(response, "content", None)
+    diagnosis_text: Optional[str] = None
+
+    if isinstance(raw_content, list):
+        # Look for a block with a 'text' field
+        for block in raw_content:
+            if isinstance(block, dict):
+                text_val = block.get("text")
+                if isinstance(text_val, str):
+                    diagnosis_text = text_val
+                    break
+    elif isinstance(raw_content, dict):
+        # Single block dict with text
+        text_val = raw_content.get("text")
+        if isinstance(text_val, str):
+            diagnosis_text = text_val
+    elif isinstance(raw_content, (str, bytes, bytearray)):
+        diagnosis_text = raw_content.decode() if isinstance(raw_content, (bytes, bytearray)) else raw_content
+
+    if not diagnosis_text:
+        # Fallback to stringifying whatever we got, or default message
+        diagnosis_text = str(raw_content) if raw_content is not None else "Unable to generate diagnosis."
+
+    return {"diagnosis": diagnosis_text}
 
 
 def build_app():
@@ -234,17 +372,14 @@ def main():
     thread_id = "medical-diagnosis-1"
     config = {"configurable": {"thread_id": thread_id}}
     
-    app.get_graph().draw_mermaid()  # Visualize the graph
     
     # Example medical case - you can modify these for different scenarios
     initial_state = {
         "symptoms": [
-            "chest pain",
-            "shortness of breath", 
-            "fatigue",
-            "dizziness"
+            "headache",
+            "mild nausea"
         ],
-        "medical_records": "45-year-old male, hypertension, family history of heart disease, smoker for 20 years",
+        "medical_records": "28-year-old female, no significant medical history",
         "questions_asked": [],
         "responses": []
     }
@@ -260,60 +395,104 @@ def main():
         payload = result["__interrupt__"][0].value
         query = payload.get("query", "Please provide more information")
         options = payload.get("options")
+        question_type = payload.get("question_type", "multiple_choice")
         
-        print(f"\n Triage Assistant asks: {query}")
-        if options:
-            try:
-                # If options is a dict of label->description
-                if isinstance(options, dict):
-                    print("   Available options:")
-                    for k, v in options.items():
-                        if v:
-                            print(f"     - {k}: {v}")
-                        else:
-                            print(f"     - {k}")
-                else:
-                    # Fallback for list[str]
-                    print(f"   Available options: {', '.join(options)}")
-            except Exception:
-                print("   Medical options provided.")
+        print(f"\n🏥 Triage Assistant asks: {query}")
         
-        user_value = input(f"\n Patient response: ").strip()
-        if not user_value and options:
-            # Default to first option if provided
-            try:
-                if isinstance(options, dict):
-                    user_value = next(iter(options.keys()))
-                else:
-                    user_value = options[0]
-            except Exception:
-                user_value = "Unknown"
-        elif not user_value:
-            user_value = "No additional information provided"
+        if question_type == "open_ended":
+            print("   (Please describe in your own words)")
+            user_value = input(f"\n Patient response: ").strip()
+            if not user_value:
+                user_value = "No additional information provided"
+        else:
+            # Multiple choice question
+            if options:
+                try:
+                    # If options is a dict of label->description
+                    if isinstance(options, dict):
+                        print("   Available options:")
+                        for i, (k, v) in enumerate(options.items(), 1):
+                            if v:
+                                print(f"     {i}. {k}: {v}")
+                            else:
+                                print(f"     {i}. {k}")
+                    else:
+                        # Fallback for list[str]
+                        print("   Available options:")
+                        for i, option in enumerate(options, 1):
+                            print(f"     {i}. {option}")
+                except Exception:
+                    print("   Medical options provided.")
+            
+            user_value = input(f"\n Patient response (choose number or describe): ").strip()
+            
+            # Handle numeric selection for multiple choice
+            if user_value.isdigit() and options:
+                try:
+                    idx = int(user_value) - 1
+                    if isinstance(options, dict):
+                        user_value = list(options.keys())[idx]
+                    else:
+                        user_value = options[idx]
+                except (IndexError, ValueError):
+                    pass  # Keep original input if invalid selection
+            
+            if not user_value and options:
+                # Default to first option if provided
+                try:
+                    if isinstance(options, dict):
+                        user_value = next(iter(options.keys()))
+                    else:
+                        user_value = options[0]
+                except Exception:
+                    user_value = "Unknown"
+            elif not user_value:
+                user_value = "No additional information provided"
             
         print(f"   Response recorded: {user_value}")
         
-        # Update the responses in state and resume
+        # Update the responses and questions_asked in state and resume
         current_state = app.get_state(config)
         current_responses = current_state.values.get('responses', [])
+        current_questions = current_state.values.get('questions_asked', [])
+
         updated_responses = current_responses + [user_value]
-        
-        result = app.invoke(Command(resume=user_value, update={"responses": updated_responses}), config=config)
+        updated_questions = current_questions + [query]
+
+        result = app.invoke(
+            Command(
+                resume=user_value,
+                update={
+                    "responses": updated_responses,
+                    "questions_asked": updated_questions,
+                },
+            ),
+            config=config,
+        )
 
     # Print the final diagnosis
     if isinstance(result, dict) and "diagnosis" in result:
         print("\n" + "="*60)
         print("🏥 DIFFERENTIAL DIAGNOSIS (JSON)")
         print("="*60)
+
+        diagnosis_payload = result["diagnosis"]
         
-        try:
-            # Try to parse as JSON for pretty printing
-            diagnosis_json = json.loads(result["diagnosis"])
-            print(json.dumps(diagnosis_json, indent=2, ensure_ascii=False))
-        except json.JSONDecodeError:
-            # Fallback to raw text if not valid JSON
-            print("Raw output (not valid JSON):")
-            print(result["diagnosis"])
+        # If the model returned a list/dict directly, pretty-print it
+        if isinstance(diagnosis_payload, (list, dict)):
+            print(json.dumps(diagnosis_payload, indent=2, ensure_ascii=False))
+        else:
+            try:
+                # Ensure we have a string for json.loads
+                if not isinstance(diagnosis_payload, (str, bytes, bytearray)):
+                    diagnosis_payload = str(diagnosis_payload)
+                # Try to parse as JSON for pretty printing
+                diagnosis_json = json.loads(diagnosis_payload)
+                print(json.dumps(diagnosis_json, indent=2, ensure_ascii=False))
+            except (json.JSONDecodeError, TypeError):
+                # Fallback to raw text if not valid JSON
+                print("Raw output (not valid JSON):")
+                print(diagnosis_payload)
     else:
         print("Unexpected result:", result)
 
