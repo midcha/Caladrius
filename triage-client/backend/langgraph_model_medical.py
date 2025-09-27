@@ -107,7 +107,7 @@ def agent_node(state: State):
     coverage_guidance += "NEXT QUESTION PRIORITY: Ask about one of the missing areas above."
     
     # Determine if we should ask more questions or proceed to diagnosis
-    max_questions = 3  # Allow for more thorough information gathering
+    max_questions = 10  # Allow for more thorough information gathering
     should_continue_questioning = len(questions_asked) < max_questions
     
     messages = [
@@ -397,7 +397,7 @@ def main():
         options = payload.get("options")
         question_type = payload.get("question_type", "multiple_choice")
         
-        print(f"\n🏥 Triage Assistant asks: {query}")
+        print(f"\nTriage Assistant asks: {query}")
         
         if question_type == "open_ended":
             print("   (Please describe in your own words)")

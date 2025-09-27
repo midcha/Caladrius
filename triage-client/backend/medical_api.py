@@ -22,6 +22,9 @@ app.add_middleware(
 
 graph = build_app()
 
+# Sentinel token used by frontend to indicate the user skipped a question
+SKIP_TOKEN = "__skip__"
+
 
 @app.get("/")
 def read_root():
@@ -41,6 +44,7 @@ class StartRequest(BaseModel):
 class ResumeRequest(BaseModel):
     thread_id: str
     response: str
+    question: Optional[str] = None
 
 
 def serialize_result(result: dict):
@@ -120,15 +124,25 @@ def resume_diagnosis(req: ResumeRequest):
     config = {"configurable": {"thread_id": req.thread_id}}
     
     try:
-        # Get current state to update responses
+        # Get current state to update responses and questions
         current_state = graph.get_state(config)
         current_responses = current_state.values.get('responses', [])
-        updated_responses = current_responses + [req.response]
-        
-        # Resume with the response and update state
+        current_questions = current_state.values.get('questions_asked', [])
+
+        # Convert skip token to a friendly recorded response
+        recorded_response = "No Response" if (req.response or "").strip() == SKIP_TOKEN else req.response
+
+        updated_responses = current_responses + [recorded_response]
+        updated_questions = current_questions + ([req.question] if req.question else [])
+
+        # Resume with the response and update state (include questions if provided)
+        update_payload = {"responses": updated_responses}
+        if req.question:
+            update_payload["questions_asked"] = updated_questions
+
         result = graph.invoke(
-            Command(resume=req.response, update={"responses": updated_responses}), 
-            config=config
+            Command(resume=recorded_response, update=update_payload),
+            config=config,
         )
         return serialize_result(result)
     except Exception as e:
