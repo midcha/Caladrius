@@ -20,7 +20,7 @@ def ask_user_for_input(
         options: Dictionary of answer choices for multiple choice questions.
                 Example: {"A few hours ago": "", "Yesterday": "", "Several days ago": ""}
                 Set to None for open-ended questions.
-        question_type: Type of question - "multiple_choice" or "open_ended"
+    question_type: Type of question - "multiple_choice", "open_ended", or "select_multiple"
         
     QUESTION TYPE GUIDELINES:
     
@@ -47,11 +47,20 @@ def ask_user_for_input(
         
     # Create interrupt payload
     interrupt_payload = {"query": query, "question_type": question_type}
-    if options and question_type == "multiple_choice":
+    if options and question_type in ("multiple_choice", "select_multiple"):
         interrupt_payload["options"] = options
         
     # Get user input through interrupt
     user_input = interrupt(interrupt_payload)
+
+    # If the UI returns multiple selections as a list for select_multiple,
+    # normalize it to a comma-separated string for consistent downstream handling.
+    if question_type == "select_multiple":
+        try:
+            if isinstance(user_input, list):
+                user_input = ", ".join(str(x) for x in user_input)
+        except Exception:
+            pass
     
     # Create faux messages representing this interaction
     # This preserves the conversation flow for better AI understanding
@@ -62,10 +71,16 @@ def ask_user_for_input(
         if options:
             # If options is a dict of label->description
             if isinstance(options, dict):
-                ai_question.content += f" Please choose from: {', '.join(f'{op}: {description}' for op, description in options.items())}"
+                if question_type == "select_multiple":
+                    ai_question.content += f" You may choose one or more of: {', '.join(f'{op}: {description}' for op, description in options.items())}"
+                else:
+                    ai_question.content += f" Please choose from: {', '.join(f'{op}: {description}' for op, description in options.items())}"
             else:
                 # Fallback for list[str]
-                ai_question.content += f" Please choose from: {', '.join(options)}"
+                if question_type == "select_multiple":
+                    ai_question.content += f" You may choose one or more of: {', '.join(options)}"
+                else:
+                    ai_question.content += f" Please choose from: {', '.join(options)}"
 
     user_response = HumanMessage(content=user_input)
     

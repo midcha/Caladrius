@@ -55,6 +55,7 @@ def serialize_result(result: dict):
             "type": "question",
             "query": payload.get("query"),
             "options": payload.get("options"),
+            "question_type": payload.get("question_type"),
             "status": "waiting_for_response"
         }
     
