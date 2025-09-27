@@ -41,22 +41,60 @@ export default function SymptomsInput() {
   const hasSymptoms = text.trim().length > 0;
   const hasRequiredData = hasSymptoms || patientData.symptoms.length > 0;
 
+  const commonSymptoms = [
+    "Chest pain", "Shortness of breath", "Fever", "Headache", "Dizziness", 
+    "Nausea", "Fatigue", "Cough", "Abdominal pain", "Back pain"
+  ];
+
+  const addSuggestion = (symptom: string) => {
+    const currentSymptoms = text.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    if (!currentSymptoms.includes(symptom)) {
+      const newText = text.trim() ? `${text.trim()}, ${symptom}` : symptom;
+      setText(newText);
+    }
+  };
+
   return (
-    <div className={s.card}>
-      <p className={ui.kicker}>Step 3</p>
-      <h2 className={ui.title}>Describe current symptoms</h2>
-      <p className={ui.sub}>
-        List your symptoms separated by commas (e.g., chest pain, shortness of breath, fatigue)
-      </p>
+    <div className={`${s.card} ${s.slideIn}`}>
+      <div className={s.header}>
+        <p className={ui.kicker}>Step 3 of 3</p>
+        <h2 className={ui.title}>Tell us about your symptoms</h2>
+        <p className={ui.sub}>
+          Describe what you're experiencing. Be as specific as possible - this helps us provide better care recommendations.
+        </p>
+      </div>
+      
+      {/* Quick symptom suggestions */}
+      <div className={s.suggestions}>
+        <p className={s.suggestionsLabel}>Common symptoms (click to add):</p>
+        <div className={s.suggestionTags}>
+          {commonSymptoms.map((symptom, index) => (
+            <button
+              key={symptom}
+              type="button"
+              className={`${s.suggestionTag} ${s.fadeIn}`}
+              style={{ animationDelay: `${index * 0.05}s` }}
+              onClick={() => addSuggestion(symptom)}
+            >
+              {symptom}
+            </button>
+          ))}
+        </div>
+      </div>
       
       <form onSubmit={handleSaveSymptoms}>
-        <textarea
-          className={`${ui.input} ${ui.textarea}`}
-          placeholder="e.g., sudden chest pain, shortness of breath, dizziness..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows={4}
-        />
+        <div className={s.textareaWrapper}>
+          <textarea
+            className={`${ui.input} ${s.textarea}`}
+            placeholder="Describe your symptoms in detail... (e.g., sharp chest pain on the left side, started 2 hours ago)"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={5}
+          />
+          <div className={s.charCount}>
+            {text.length > 0 && `${text.length} characters`}
+          </div>
+        </div>
         
         <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
           <button
@@ -77,13 +115,15 @@ export default function SymptomsInput() {
       </form>
       
       {patientData.symptoms.length > 0 && (
-        <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f0f9ff', borderRadius: '4px' }}>
-          <p><strong>Saved symptoms:</strong></p>
-          <ul>
+        <div className={s.savedSymptoms}>
+          <p className={s.savedLabel}>📋 Current symptoms:</p>
+          <div className={s.symptomsList}>
             {patientData.symptoms.map((symptom, index) => (
-              <li key={index}>{symptom}</li>
+              <span key={index} className={`${s.symptomChip} ${s.slideIn}`} style={{ animationDelay: `${index * 0.1}s` }}>
+                {symptom}
+              </span>
             ))}
-          </ul>
+          </div>
         </div>
       )}
     </div>

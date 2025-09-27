@@ -67,14 +67,26 @@ export default function VitalsForm() {
   useEffect(() => {}, []);
 
   return (
-    <form onSubmit={handle} className={s.card} noValidate>
-      <p className={ui.kicker}>Step 1</p>
-      <h2 className={ui.title}>Record vital signs</h2>
-      <p className={ui.sub}>Enter initial triage measurements (numbers only).</p>
+    <form onSubmit={handle} className={`${s.card} ${s.slideIn}`} noValidate>
+      <div className={s.header}>
+        <p className={ui.kicker}>Step 1 of 3</p>
+        <h2 className={ui.title}>Record vital signs</h2>
+        <p className={ui.sub}>Enter your current measurements to help us assess your condition.</p>
+      </div>
+
+      {/* Progress indicator */}
+      <div className={s.progress}>
+        <div className={s.progressBar}>
+          <div className={s.progressFill} style={{ width: `${(Object.values(v).filter(val => val.trim() !== '').length / 6) * 100}%` }} />
+        </div>
+        <span className={s.progressText}>
+          {Object.values(v).filter(val => val.trim() !== '').length} of 6 measurements completed
+        </span>
+      </div>
 
       <div className={s.grid}>
         <Field
-          label="Temperature"
+          label="Temperature (°F)"
           placeholder="98.6"
           value={v.temperature}
           onChange={onChange("temperature")}
@@ -83,7 +95,7 @@ export default function VitalsForm() {
         />
 
         <Field
-          label="Systolic"
+          label="Systolic BP (mmHg)"
           placeholder="120"
           value={v.systolic}
           onChange={onChange("systolic")}
@@ -92,7 +104,7 @@ export default function VitalsForm() {
         />
 
         <Field
-          label="Diastolic"
+          label="Diastolic BP (mmHg)"
           placeholder="80"
           value={v.diastolic}
           onChange={onChange("diastolic")}
@@ -101,7 +113,7 @@ export default function VitalsForm() {
         />
 
         <Field
-          label="Heart rate"
+          label="Heart Rate (BPM)"
           placeholder="72"
           value={v.heartRate}
           onChange={onChange("heartRate")}
@@ -110,7 +122,7 @@ export default function VitalsForm() {
         />
 
         <Field
-          label="Respirations"
+          label="Respirations (/min)"
           placeholder="16"
           value={v.respirations}
           onChange={onChange("respirations")}
@@ -131,7 +143,7 @@ export default function VitalsForm() {
       {!ok && (
         <div className={s.actions}>
           <span className={s.hint} aria-live="polite">
-            Please fix the highlighted fields to continue.
+            Please fill the empty fields to continue.
           </span>
         </div>
       )}
@@ -151,7 +163,7 @@ function Field(props: {
   const ariaId = `${label.replace(/\s+/g, "-").toLowerCase()}-err`;
 
   return (
-    <label className={ui.stack}>
+    <label className={`${ui.stack} ${s.fieldWrapper}`}>
       <span className={ui.label}>{label}</span>
       <input
         className={`${ui.input} ${error ? s.bad : ""}`}

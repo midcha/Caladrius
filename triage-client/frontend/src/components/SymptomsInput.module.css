@@ -1,9 +1,167 @@
-/* Light glass card wrapper */
+/* Enhanced SymptomsInput styles */
 .card, .wrap, .box{
   background: var(--panel);
   backdrop-filter: blur(var(--blur));
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
   box-shadow: var(--panel-shadow);
-  padding: 24px;
+  padding: 32px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card:hover {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06), 0 8px 16px rgba(0, 0, 0, 0.04);
+  transform: translateY(-2px);
+}
+
+.slideIn {
+  animation: slideInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.header {
+  margin-bottom: 28px;
+}
+
+/* Symptom suggestions */
+.suggestions {
+  margin-bottom: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(240, 249, 255, 0.8) 0%, rgba(224, 242, 254, 0.8) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.15);
+}
+
+.suggestionsLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f766e;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.suggestionTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.suggestionTag {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(8, 145, 178, 0.2);
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0891b2;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.suggestionTag:hover {
+  background: #0891b2;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(8, 145, 178, 0.25);
+}
+
+.fadeIn {
+  animation: fadeInSlide 0.4s ease-out both;
+}
+
+@keyframes fadeInSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Textarea styling */
+.textareaWrapper {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.textarea {
+  min-height: 120px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+  padding: 16px;
+  border-radius: 8px !important;
+}
+
+.charCount {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Saved symptoms */
+.savedSymptoms {
+  margin-top: 24px;
+  padding: 20px;
+  background: rgba(16, 185, 129, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(16, 185, 129, 0.15);
+}
+
+.savedLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: #047857;
+  margin-bottom: 12px;
+}
+
+.symptomsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.symptomChip {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #047857;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .card {
+    padding: 24px 20px;
+  }
+  
+  .suggestionTags {
+    gap: 6px;
+  }
+  
+  .suggestionTag {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
 }

@@ -1,5 +1,5 @@
 import os
-from typing import Optional, TypedDict, Annotated
+from typing import Optional, TypedDict, Annotated, Union, Dict, Any
 
 import dotenv
 from langgraph.graph import StateGraph, END, add_messages
@@ -9,7 +9,7 @@ from langchain_core.tools import tool
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 
-from user_feedback_tool import ask_user_for_input
+from tools import ask_user_for_input, query_medical_history
 
 # For debugging and visualization
 import json
@@ -20,7 +20,7 @@ dotenv.load_dotenv()
 
 class State(TypedDict, total=False):
     symptoms: list[str]
-    medical_records: Optional[str]
+    medical_records: Optional[Union[str, Dict[str, Any]]]
     questions_asked: list[str]
     responses: list[str]
     diagnosis: Optional[str]
@@ -42,7 +42,7 @@ def log_step(step_name: str, state: State, extra_info: str = ""):
 
 
 # Register available tools for medical diagnosis
-tools = [ask_user_for_input]
+tools = [ask_user_for_input, query_medical_history]
 # Note: We handle tool execution manually below to support interrupt-based flows.
 
 
@@ -66,7 +66,6 @@ def agent_node(state: State):
     
     # Build the diagnostic context
     symptoms_str = ", ".join(symptoms) if symptoms else "No symptoms provided"
-    medical_context = f"Medical Records: {medical_records or 'No medical history provided'}"
     questions_context = f"Previous Questions Asked: {len(questions_asked)}"
     
     # Analyze what areas have been covered based on previous questions
@@ -112,109 +111,29 @@ def agent_node(state: State):
     
     messages = [
         SystemMessage(content=(
-            "You are a thorough medical assistant helping to understand a patient's symptoms. Your role is to:\n"
-            "1. Gather comprehensive information about the patient's condition\n"
-            "2. Ask ONE thoughtful, strategic question at a time\n"
-            "3. Continue questioning until you have enough information for accurate diagnosis\n\n"
-            "CURRENT SITUATION:\n"
-            f"What the patient is experiencing: {symptoms_str}\n"
-            f"{medical_context}\n"
-            f"{questions_context}\n\n"
-            f"COVERAGE ANALYSIS:\n"
+            "You are a medical assistant gathering information for diagnosis. Ask ONE clear question at a time.\n\n"
+            f"Patient symptoms: {symptoms_str}\n"
+            f"{questions_context}\n"
             f"{coverage_guidance}\n\n"
-            "MANDATORY QUESTION AREAS - You MUST ask about ALL of these systematically:\n"
-            "\n"
-            "1. TIMING (if not covered): When did symptoms start? How long do they last? Any pattern?\n"
-            "2. SEVERITY (if not covered): Rate 1-10? Interfering with activities? Getting worse/better?\n"
-            "3. QUALITY (ALWAYS ask): What does it feel like? Sharp/dull/throbbing/burning/pressure?\n"
-            "4. LOCATION (ALWAYS ask): Exactly where? Does it spread anywhere?\n"
-            "5. TRIGGERS (CRITICAL): What makes it better or worse? Food, position, activity, rest?\n"
-            "6. ASSOCIATED SYMPTOMS (CRITICAL): Any other symptoms happening at the same time?\n"
-            "7. CONTEXT (CRITICAL): What were you doing when it started? Any recent changes?\n"
-            "8. MEDICAL HISTORY (CRITICAL): Ever had this before? Family history? Current medications?\n"
-            "9. FUNCTIONAL IMPACT: How is this affecting your daily life, sleep, work?\n"
-            "\n"
-            "QUESTIONING SEQUENCE: After basic timing/severity, IMMEDIATELY move to quality, triggers, associated symptoms, and context.\n"
-            "DO NOT get stuck on just timing and severity questions - branch out to explore other diagnostic areas.\n\n"
-            "QUESTION TYPES - Mix these for comprehensive assessment:\n"
-            "\n"
-            "EXAMPLE QUESTIONS BY CATEGORY:\n"
-            "\n"
-            "QUALITY/DESCRIPTION (open_ended):\n"
-            "- 'Can you describe exactly what this pain feels like?'\n"
-            "- 'What words would you use to describe the sensation?'\n"
-            "\n"
-            "TRIGGERS/PATTERNS (open_ended):\n"
-            "- 'What makes this better or worse?'\n"
-            "- 'Have you noticed anything that seems to trigger it?'\n"
-            "- 'Does changing position, eating, or resting affect it?'\n"
-            "\n"
-            "ASSOCIATED SYMPTOMS (open_ended):\n"
-            "- 'Are you experiencing any other symptoms along with this?'\n"
-            "- 'Have you noticed anything else unusual happening in your body?'\n"
-            "\n"
-            "CONTEXT/CIRCUMSTANCES (open_ended):\n"
-            "- 'What were you doing when this first started?'\n"
-            "- 'Has anything changed in your life recently - diet, stress, medications, activities?'\n"
-            "- 'Tell me about the day this began.'\n"
-            "\n"
-            "MEDICAL HISTORY (multiple_choice + open_ended):\n"
-            "- 'Have you ever experienced anything like this before?' (Yes/No/Not sure)\n"
-            "- 'What medications are you currently taking?' (open_ended)\n"
-            "- 'Does anyone in your family have similar health issues?' (open_ended)\n"
-            "\n"
-            "MANDATORY: After 2 basic questions (timing/severity), you MUST ask about triggers, associated symptoms, or context.\n\n"
-            "LANGUAGE GUIDELINES:\n"
-            "- Use simple, everyday words instead of medical terms\n"
-            "- Be conversational and empathetic\n"
-            "- For multiple choice: include 'other' or 'not sure' options\n"
-            "- For open questions: encourage detailed, personal descriptions\n\n"
-            f"PROGRESS CHECK:\n"
-            f"- Questions asked so far: {len(questions_asked)}/{max_questions}\n"
-            f"- REQUIRED MINIMUM: You MUST ask at least 5 questions before responding 'READY_FOR_DIAGNOSIS'.\n"
-            f"- IDENTIFY which critical areas are still missing from the conversation\n"
-            f"- REQUIRED COVERAGE: You must have asked about timing, severity, quality, location, and at least 2 of: triggers, associated symptoms, context, medical history, functional impact.\n"
-            f"- Do not respond 'READY_FOR_DIAGNOSIS' before both conditions are met, even if you think you have enough information.\n\n"
-            f"AREA COVERAGE CHECK - Look at previous Q&A and identify what's missing:\n"
-            f"□ Basic timing and severity (usually covered first)\n"
-            f"□ Quality/description of symptoms (what does it feel like?)\n"
-            f"□ Triggers and modifying factors (what makes it better/worse?)\n"
-            f"□ Associated symptoms (other symptoms happening together?)\n"
-            f"□ Context and circumstances (what was happening when it started?)\n"
-            f"□ Medical history and medications (past episodes, current meds?)\n"
-            f"□ Functional impact (how affecting daily life?)\n\n"
-            f"INFORMATION COMPLETENESS CHECKLIST:\n"
-            f"CRITICAL (must have for diagnosis):\n"
-            f"  ✓ TIMING: When did symptoms start? How long have they lasted?\n"
-            f"  ✓ SEVERITY: How intense/severe are the symptoms? Impact on daily life?\n"
-            f"  ✓ CHARACTER: What do the symptoms feel like? (quality, description)\n"
-            f"  ✓ LOCATION: Where exactly are the symptoms? Do they spread?\n"
-            f"\n"
-            f"IMPORTANT (should have for accurate diagnosis):\n"
-            f"  ✓ TRIGGERS: What makes symptoms better or worse?\n"
-            f"  ✓ ASSOCIATED: Any other symptoms happening at the same time?\n"
-            f"  ✓ CONTEXT: What was happening when symptoms started? Recent changes?\n"
-            f"  ✓ HISTORY: Similar episodes before? Family history? Current medications?\n"
-            f"\n"
-            f"DECISION FRAMEWORK:\n"
-            f"- If you need more specific information about symptoms: use ask_user_for_input tool\n"
-            f"- If you have gathered comprehensive diagnostic information: respond 'READY_FOR_DIAGNOSIS'\n"
-            f"- Aim to ask 4-8 thoughtful questions covering different diagnostic areas\n"
-            f"- Don't ask too many similar questions - diversify your inquiry\n\n"
-            f"QUESTIONING GUIDELINES:\n"
-            f"1. Start with basic timing and severity if not clear\n"
-            f"2. Then explore quality, triggers, associated symptoms, context\n"
-            f"3. Include medical history and functional impact\n"
-            f"4. Use both open-ended and multiple choice questions\n"
-            f"5. Stop when you have enough information for differential diagnosis\n\n"
-            f"NEXT ACTION:\n"
-            f"- Review the missing areas above and the previous conversation\n"
-            f"- If important diagnostic information is still missing OR minimum question count not reached: use ask_user_for_input\n"
-            f"- Only respond 'READY_FOR_DIAGNOSIS' when:\n"
-            f"  1. Minimum number of questions (5) has been asked\n"
-            f"  2. Sufficient coverage of critical diagnostic areas has been achieved\n"
-            "- Focus on asking thoughtful questions, not rushing to diagnosis"
-            "Use everyday language, not medical terms. Be helpful and caring in your tone."
+            "Essential areas to cover:\n"
+            "• Timing: When started? Duration? Pattern?\n"
+            "• Quality: How does it feel?\n"
+            "• Triggers: What makes it better/worse?\n"
+            "• Other symptoms: Anything else happening?\n"
+            "• Context: What were you doing when it started?\n"
+            "• Medical history: Had this before? Medications?\n\n"
+            f"Progress: {len(questions_asked)}/{max_questions} questions asked\n\n"
+            "Guidelines:\n"
+            "• Keep questions SHORT (max 8-10 words)\n"
+            "• Use simple, everyday language\n"
+            "• One focused question at a time\n"
+            "• Be direct but caring\n"
+            "• Ask at least 5 questions before diagnosis\n"
+            "• Focus on missing areas from the list above\n\n"
+            "Actions:\n"
+            "• Need more info: use ask_user_for_input tool\n"
+            "• Query patient's medical records: use query_medical_history tool\n"
+            "• Have enough info (5+ questions, key areas covered): respond 'READY_FOR_DIAGNOSIS'\n"
         )),
         HumanMessage(content=f"Patient presents with: {symptoms_str}")
     ]
@@ -250,6 +169,34 @@ def agent_node(state: State):
                 
                 # Update state and return the interrupt
                 return ask_user_for_input.invoke(params)
+            
+            elif tool_name == "query_medical_history":
+                # Query medical history records
+                medical_records = state.get('medical_records', '')
+                field_path = tool_args.get("field_path", "")
+                criteria = tool_args.get("specific_criteria")
+                
+                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] MEDICAL HISTORY QUERY (Agent Node)")
+                print(f"   Field Path: {field_path}")
+                print(f"   Criteria: {criteria or 'None'}")
+                print(f"   Has Records: {'Yes' if medical_records else 'No'}")
+                
+                if not medical_records:
+                    result = "No medical records available for this patient."
+                    print(f"   Result: {result}")
+                else:
+                    result = query_medical_history.invoke({
+                        "medical_records": medical_records,
+                        "field_path": field_path,
+                        "specific_criteria": criteria
+                    })
+                    print(f"   Result: {result[:100]}{'...' if len(result) > 100 else ''}")
+                
+                print("-" * 60)
+                
+                # Add the query result to messages for context
+                query_message = AIMessage(content=f"Medical history query result: {result}")
+                return Command(update={"messages": [query_message]}, goto="agent")
     
     # No tool calls - proceed to diagnosis only if we have enough information
     return Command(goto="final_output")
@@ -259,12 +206,12 @@ def final_output_node(state: State):
     """Generate final medical diagnosis with top 5 possible causes."""
     log_step("FINAL_OUTPUT_NODE", state, "Generating differential diagnosis")
     
-    # Initialize ChatOpenAI
+    # Initialize ChatOpenAI with tools
     model = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.3")),  # Lower temp for medical accuracy
         reasoning={"effort": "medium"},
-    )
+    ).bind_tools([query_medical_history])
     
     # Extract medical context from state
     symptoms = state.get('symptoms', [])
@@ -274,7 +221,6 @@ def final_output_node(state: State):
     
     # Build comprehensive medical context
     symptoms_str = ", ".join(symptoms) if symptoms else "No symptoms provided"
-    medical_context = medical_records or "No medical history provided"
     
     # Create Q&A summary
     qa_summary = ""
@@ -288,8 +234,16 @@ def final_output_node(state: State):
     messages = [
         SystemMessage(content=(
             "You are an experienced physician providing a differential diagnosis. "
-            "Based on the patient's symptoms, medical history, and answers to clarifying questions, "
-            "provide your TOP 5 MOST LIKELY diagnoses.\n\n"
+            "BEFORE generating your diagnosis, you MUST query the patient's medical history for relevant information.\n\n"
+            "REQUIRED FIRST STEP: Use the query_medical_history tool to gather relevant background information:\n"
+            "- Query allergies: 'medicalHistory.allergies'\n"
+            "- Query current medications: 'medicalHistory.prescriptions'\n"
+            "- Query family history: 'medicalHistory.familyHistory'\n"
+            "- Query recent labs: 'medicalHistory.labs'\n"
+            "- Query imaging studies: 'medicalHistory.imaging'\n"
+            "- Query past medical encounters: 'medicalHistory.encounters'\n"
+            "- Query demographics: 'sex', 'ethnicity', 'bloodType'\n\n"
+            "After gathering medical history, provide your TOP 5 MOST LIKELY diagnoses.\n\n"
             "RESPOND ONLY WITH A VALID JSON OBJECT in this exact format:\n"
             "{\n"
             "  \"differential_diagnosis\": [\n"
@@ -297,7 +251,7 @@ def final_output_node(state: State):
             "      \"rank\": 1,\n"
             "      \"diagnosis\": \"Condition Name\",\n"
             "      \"probability_percent\": 45,\n"
-            "      \"reasoning\": \"Brief clinical reasoning\",\n"
+            "      \"reasoning\": \"Brief clinical reasoning including relevant medical history\",\n"
             "      \"key_features\": [\"symptom1\", \"finding2\"],\n"
             "      \"next_steps\": [\"test1\", \"treatment2\"]\n"
             "    }\n"
@@ -311,7 +265,9 @@ def final_output_node(state: State):
             "Include 'urgency_level_text' as a human-readable label matching the numeric level.\n\n"
             "Consider:\n"
             "- Most common conditions first (common things are common)\n"
-            "- Age, gender, and risk factors\n"
+            "- Age, gender, and risk factors from medical history\n"
+            "- Allergies and current medications from medical history\n"
+            "- Past medical encounters and family history\n"
             "- Red flags requiring immediate attention\n"
             "- Pattern recognition from symptom clusters\n"
             "- Temporal relationships and triggers\n"
@@ -320,7 +276,6 @@ def final_output_node(state: State):
         HumanMessage(content=f"""
 PATIENT PRESENTATION:
 Symptoms: {symptoms_str}
-Medical History: {medical_context}
 
 CLINICAL INTERVIEW:
 {qa_summary if qa_summary else "No additional questions were asked."}
@@ -331,6 +286,49 @@ Please provide your differential diagnosis with the top 5 most likely conditions
 
     # Call the model for diagnosis
     response = model.invoke(messages)
+    
+    # Handle tool calls for medical history queries
+    if response.tool_calls:
+        # Process medical history queries first
+        medical_history_context = []
+        
+        for tool_call in response.tool_calls:
+            tool_name = tool_call["name"]
+            tool_args = tool_call.get("args", {}) or {}
+            
+            if tool_name == "query_medical_history":
+                field_path = tool_args.get("field_path", "")
+                criteria = tool_args.get("specific_criteria")
+                
+                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] MEDICAL HISTORY QUERY (Final Output Node)")
+                print(f"   Field Path: {field_path}")
+                print(f"   Criteria: {criteria or 'None'}")
+                print(f"   Has Records: {'Yes' if medical_records else 'No'}")
+                
+                if medical_records:
+                    result = query_medical_history.invoke({
+                        "medical_records": medical_records,
+                        "field_path": field_path,
+                        "specific_criteria": criteria
+                    })
+                    print(f"   Result: {result[:100]}{'...' if len(result) > 100 else ''}")
+                    medical_history_context.append(f"{field_path}: {result}")
+                else:
+                    print(f"   Result: No medical records available")
+                    medical_history_context.append(f"{field_path}: No medical records available")
+                
+                print("-" * 60)
+        
+        # Add medical history context and call model again for final diagnosis
+        if medical_history_context:
+            history_summary = "\n".join(medical_history_context)
+            print(f"\n[{datetime.now().strftime('%H:%M:%S')}] ADDING MEDICAL HISTORY TO DIAGNOSIS")
+            print(f"   Queries Completed: {len(medical_history_context)}")
+            print(f"   Context Length: {len(history_summary)} characters")
+            print("-" * 60)
+            
+            messages.append(HumanMessage(content=f"\nMEDICAL HISTORY QUERY RESULTS:\n{history_summary}\n\nNow provide your differential diagnosis based on all available information."))
+            response = model.invoke(messages)
 
     # Extract text content: some providers return structured content blocks
     raw_content = getattr(response, "content", None)

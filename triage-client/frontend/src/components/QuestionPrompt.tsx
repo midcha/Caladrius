@@ -38,29 +38,57 @@ export default function QuestionPrompt() {
   };
 
   return (
-    <div className={s.wrap}>
-      <p className={ui.kicker}>Diagnostic Question</p>
-      <p className={s.q}>{currentQuestion.query}</p>
+    <div className={`${s.wrap} ${s.slideIn}`}>
+      <div className={s.twoColumnLayout}>
+        {/* Left Column - Question */}
+        <div className={s.questionColumn}>
+          <div className={s.header}>
+            {/* Caladrius Character */}
+            <div className={s.caladriusIntro}>
+              <div className={s.caladriusAvatar}>
+                <img src="/caladrius.png" alt="Caladrius" className={s.caladriusImage} />
+              </div>
+              <div className={s.caladriusText}>
+                <p className={ui.kicker}>Medical Assessment</p>
+                <h3 className={s.caladriusName}>Caladrius asks:</h3>
+              </div>
+            </div>
+            
+            <div className={s.questionBox}>
+              <p className={s.q}>{currentQuestion.query}</p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Right Column - Response Area */}
+        <div className={s.responseColumn}>
 
-      {hasOptions && qType === 'select_multiple' ? (
-        // Select-multiple with optional free response and skip
-        <div className={ui.stack}>
+          {hasOptions && qType === 'select_multiple' ? (
+            // Select-multiple with optional free response and skip
+            <div className={ui.stack}>
           <p className={ui.sub}>You may select one or more options:</p>
           <div className={s.options}>
-            {Object.entries(currentQuestion.options!).map(([key, description]) => {
+            {Object.entries(currentQuestion.options!).map(([key, description], index) => {
               const displayKey = String(key).replace(/[:\s]+$/, "");
               const displayDesc = String(description).replace(/[:\s]+$/, "");
               const checked = selected.includes(key);
               return (
-                <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <label 
+                  key={key} 
+                  className={`${s.optionLabel} ${checked ? s.checked : ''} ${s.fadeIn}`}
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
                   <input
                     type="checkbox"
                     disabled={busy}
                     checked={checked}
                     onChange={() => toggleOption(key)}
+                    className={s.checkbox}
                   />
-                  <span>
-                    <strong>{displayKey}</strong>{displayDesc ? ` ${displayDesc}` : ""}
+                  <div className={s.checkmark}></div>
+                  <span className={s.optionText}>
+                    <strong>{displayKey}</strong>
+                    {displayDesc && <span className={s.optionDesc}> {displayDesc}</span>}
                   </span>
                 </label>
               );
@@ -122,24 +150,22 @@ export default function QuestionPrompt() {
         <div className={ui.stack}>
           <p className={ui.sub}>Please select one of the following options:</p>
           <div className={s.options}>
-            {Object.entries(currentQuestion.options!).map(([key, description]) => {
+            {Object.entries(currentQuestion.options!).map(([key, description], index) => {
               const displayKey = String(key).replace(/[:\s]+$/, "");
               const displayDesc = String(description).replace(/[:\s]+$/, "");
               return (
                 <button
                   key={key}
-                  className={`${ui.btn} ${ui.primary}`}
+                  className={`${s.optionButton} ${s.fadeIn}`}
+                  style={{ animationDelay: `${index * 0.1}s` }}
                   disabled={busy}
                   onClick={() => answerQuestion(key)}
-                  style={{ 
-                    display: 'block', 
-                    width: '100%', 
-                    marginBottom: '8px',
-                    textAlign: 'left',
-                    padding: '12px 16px'
-                  }}
                 >
-                  <strong>{displayKey}</strong>{displayDesc ? ` ${displayDesc}` : ""}
+                  <div className={s.optionContent}>
+                    <strong className={s.optionKey}>{displayKey}</strong>
+                    {displayDesc && <span className={s.optionDesc}>{displayDesc}</span>}
+                  </div>
+                  <div className={s.optionArrow}>→</div>
                 </button>
               );
             })}
@@ -212,8 +238,10 @@ export default function QuestionPrompt() {
               Skip Question
             </button>
           </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -1,0 +1,85 @@
+/* Step Transition Animation Styles */
+
+.container {
+  position: relative;
+  width: 100%;
+}
+
+.loadingWrapper, 
+.contentWrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fadeIn {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+.fadeOut {
+  opacity: 0;
+  transform: translateY(-20px);
+  visibility: hidden;
+  display: none;
+}
+
+.slideIn {
+  opacity: 1;
+  transform: translateX(0);
+  visibility: visible;
+}
+
+.slideOut {
+  opacity: 0;
+  transform: translateX(30px);
+  visibility: hidden;
+  display: none;
+}
+
+/* Smooth height transitions with scrolling */
+.container {
+  transition: min-height 0.3s ease;
+}
+
+/* Loading wrapper positioning */
+.loadingWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(240, 249, 255, 0.5);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+/* Content wrapper styling */
+.contentWrapper {
+  background: transparent;
+}
+
+/* Enhanced animations for better UX */
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.loadingWrapper.fadeIn {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .fadeOut, .slideOut {
+    transform: translateY(-10px);
+  }
+  
+  .slideOut {
+    transform: translateX(20px);
+  }
+}

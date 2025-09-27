@@ -2,55 +2,106 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap');
 
 :root{
-  /* Palette */
-  --bg: #ffffff;
-  --bg-2: #F8FBFF;
-  --panel: rgba(255,255,255,0.72);
-  --panel-border: rgba(17, 24, 39, 0.08);
-  --panel-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-  --text: #1A1C1E;
-  --muted: #6B7280;
-  --placeholder: #A0AEC0;
+  /* Enhanced Medical Color Palette */
+  --bg: #fefefe;
+  --bg-2: #f0f9ff;
+  --panel: rgba(255,255,255,0.85);
+  --panel-border: rgba(8, 145, 178, 0.12);
+  --panel-shadow: 0 12px 35px rgba(8, 145, 178, 0.08), 0 4px 16px rgba(8, 145, 178, 0.04);
+  --text: #1f2937;
+  --muted: #6b7280;
+  --placeholder: #9ca3af;
 
-  /* Accents */
-  --teal: #2EC4B6;         /* primary */
-  --blue-1: #2A7DE1;       /* gradient start */
-  --blue-2: #56CCF2;       /* gradient end */
-  --danger: #FF4D6D;
-  --warning: #FFB020;
-  --success: #2EFFA3;
+  /* Calming Medical Accents */
+  --teal: #0891b2;         /* primary - calming cyan */
+  --blue-1: #3b82f6;       /* gradient start - trust blue */
+  --blue-2: #06b6d4;       /* gradient end - healing cyan */
+  --danger: #ef4444;       /* softer red */
+  --warning: #f59e0b;      /* warm amber */
+  --success: #10b981;      /* reassuring green */
+  --healing: #14b8a6;      /* teal for healing */
+  --calm: #8b5cf6;         /* purple for calm */
 
-  /* Radii & effects */
-  --radius: 16px;
-  --blur: 14px;
-  --focus-ring: 0 0 0 3px rgba(46,196,182,0.25);
+  /* Enhanced Effects */
+  --radius: 12px;
+  --blur: 16px;
+  --focus-ring: 0 0 0 3px rgba(8, 145, 178, 0.2);
+  --hover-lift: 0 8px 25px rgba(8, 145, 178, 0.12);
 }
 
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+
+html {
+  height: 100%;
+  min-height: 100%;
+}
 
 body {
   margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for mobile */
   color: var(--text);
-  background: linear-gradient(180deg, var(--bg), var(--bg-2) 85%);
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+  background-attachment: fixed;
+  background-size: 100% 100%;
   font-family: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
     "Apple Color Emoji","Segoe UI Emoji";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+  transition: all 0.3s ease;
+}
+
+/* Page load animation */
+body {
+  animation: pageLoad 0.8s ease-out;
+}
+
+@keyframes pageLoad {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 
-.container{ max-width: 1040px; margin: 0 auto; padding: 32px; }
+.container{ 
+  max-width: 1040px; 
+  margin: 0 auto; 
+  padding: 32px; 
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for mobile */
+}
 hr{ border: 0; border-top: 1px solid var(--panel-border); margin: 24px 0; }
 
-/* Subtle background motion (optional, non-disruptive) */
-@keyframes floaty { from{ transform: translateY(0)} to{ transform: translateY(8px)} }
+/* Enhanced calming background motion */
+@keyframes breathe { 
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.02); }
+}
+
+@keyframes gentleFloat {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(2px, -2px) rotate(0.5deg); }
+  50% { transform: translate(-1px, -4px) rotate(-0.5deg); }
+  75% { transform: translate(-2px, -1px) rotate(0.3deg); }
+}
+
 .bg-wave {
-  position: fixed; inset: -10% -10% auto -10%;
-  height: 40vh; filter: blur(60px) saturate(120%); opacity: .15;
-  background: radial-gradient(60% 60% at 30% 50%, var(--blue-2), transparent 70%),
-              radial-gradient(40% 50% at 70% 50%, var(--teal), transparent 60%);
-  animation: floaty 6s ease-in-out infinite alternate;
+  position: fixed; 
+  inset: -15% -15% auto -15%;
+  height: 45vh; 
+  filter: blur(80px) saturate(110%); 
+  opacity: 0.08;
+  background: 
+    radial-gradient(50% 50% at 25% 40%, var(--healing), transparent 65%),
+    radial-gradient(60% 40% at 75% 60%, var(--blue-2), transparent 70%),
+    radial-gradient(40% 60% at 50% 80%, var(--calm), transparent 60%);
+  animation: gentleFloat 12s ease-in-out infinite, breathe 8s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
 }
@@ -58,9 +109,55 @@ hr{ border: 0; border-top: 1px solid var(--panel-border); margin: 24px 0; }
 /* Utilities */
 .visually-hidden{ position: absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
-/* Focus outline for keyboard users */
-:focus-visible{ outline: none; box-shadow: var(--focus-ring); border-radius: 999px; }
+/* Enhanced focus and interaction states */
+:focus-visible { 
+  outline: none; 
+  box-shadow: var(--focus-ring); 
+  border-radius: var(--radius);
+  transition: box-shadow 0.2s ease;
+}
 
-/* Spinner (unchanged) */
-@keyframes spin { to { transform: rotate(360deg); } }
-.spin { animation: spin 0.8s linear infinite; }
+/* Smooth animations for all interactive elements */
+* {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Enhanced spinner with calming motion */
+@keyframes spin { 
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); } 
+}
+.spin { 
+  animation: spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite; 
+}
+
+/* Pulse animation for loading states */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Gentle scale animation for buttons */
+@keyframes gentleScale {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .bg-wave {
+    animation: none;
+  }
+}

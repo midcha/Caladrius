@@ -5,6 +5,8 @@ import VitalsForm from "./VitalsForm";
 import PassportUploader from "./PassportUploader";
 import SymptomsInput from "./SymptomsInput";
 import QuestionPrompt from "./QuestionPrompt";
+import StepTransition from "./StepTransition";
+import LoadingAnimation from "./LoadingAnimation";
 import ui from "./ui.module.css";
 
 export default function TriageFlow() {
@@ -41,7 +43,13 @@ export default function TriageFlow() {
       {/* Step 1: Vitals */}
       {phase === "vitals" && (
         <div>
-          <VitalsForm />
+          <StepTransition 
+            isLoading={busy} 
+            loadingMessage="Preparing your health assessment..."
+            variant="heartbeat"
+          >
+            <VitalsForm />
+          </StepTransition>
           <NavigationButtons 
             onNext={nextStep}
             onPrevious={previousStep}
@@ -55,7 +63,13 @@ export default function TriageFlow() {
       {/* Step 2: Passport/Medical History */}
       {phase === "passport" && (
         <div>
-          <PassportUploader />
+          <StepTransition 
+            isLoading={busy} 
+            loadingMessage="Processing your medical history..."
+            variant="pulse"
+          >
+            <PassportUploader />
+          </StepTransition>
           <NavigationButtons 
             onNext={nextStep}
             onPrevious={previousStep}
@@ -70,7 +84,13 @@ export default function TriageFlow() {
       {/* Step 3: Symptoms */}
       {phase === "symptoms" && (
         <div>
-          <SymptomsInput />
+          <StepTransition 
+            isLoading={busy} 
+            loadingMessage="Analyzing your symptoms..."
+            variant="dots"
+          >
+            <SymptomsInput />
+          </StepTransition>
           <NavigationButtons 
             onPrevious={previousStep}
             canGoPrevious={canGoPrevious()}
@@ -82,17 +102,23 @@ export default function TriageFlow() {
       
       {/* Processing */}
       {phase === "processing" && (
-        <div className={ui.panel}>
-          <p className={ui.kicker}>Processing</p>
-          <p className={ui.sub}>
-            Analyzing your information and generating questions...
-          </p>
-          {busy && <div>Loading...</div>}
-        </div>
+        <LoadingAnimation 
+          message="Creating personalized questions based on your information..."
+          variant="heartbeat"
+          size="large"
+        />
       )}
       
       {/* Diagnostic Questions */}
-      {phase === "prompt" && <QuestionPrompt />}
+      {phase === "prompt" && (
+        <StepTransition 
+          isLoading={busy} 
+          loadingMessage="Preparing your next question..."
+          variant="spinner"
+        >
+          <QuestionPrompt />
+        </StepTransition>
+      )}
       
       {/* Final Diagnosis */}
       {phase === "diagnosis" && diagnosis && (

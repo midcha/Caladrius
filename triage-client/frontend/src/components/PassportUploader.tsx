@@ -40,53 +40,33 @@ export default function PassportUploader() {
   };
 
   return (
-    <form onSubmit={handle} className={s.card}>
-      <p className={ui.kicker}>Step 2</p>
-      <h2 className={ui.title}>Medical History (Optional)</h2>
-      <p className={ui.sub}>
-        Add medical history in JSON format including allergies, medications, and conditions.
-      </p>
-      <textarea
-        className={`${ui.input} ${ui.textarea}`}
-        value={text}
-        onChange={(e) => {
-          setText(e.target.value);
-          validateJson(e.target.value);
-        }}
-        rows={8}
-      />
-      {jsonError && (
-        <div style={{ color: '#ff6b6b', fontSize: '14px', marginTop: '4px' }}>
-          {jsonError}
-        </div>
-      )}
-      {jsonError && (
-        <div style={{ color: '#ff6b6b', fontSize: '14px', marginTop: '8px' }}>
-          Please fix the JSON format to continue.
-        </div>
-      )}
-      <div style={{ display: "flex", gap: 10, marginTop: '12px' }}>
-        <button
-          className={`${ui.btn} ${ui.ghost}`}
-          type="button"
-          onClick={() => {
-            setText("{}");
-            setJsonError(null);
+    <form onSubmit={handle} className={`${s.card} ${s.slideIn}`}>
+      <div className={s.header}>
+        <p className={ui.kicker}>Step 2 of 3</p>
+        <h2 className={ui.title}>Medical History</h2>
+        <p className={ui.sub}>
+          Upload your medical passport or enter your medical information. This helps us provide more accurate assessments.
+        </p>
+      </div>
+      
+      <div className={s.textareaWrapper}>
+        <textarea
+          className={`${ui.input} ${s.textarea} ${jsonError ? s.error : ''}`}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            validateJson(e.target.value);
           }}
-        >
-          Clear
-        </button>
-        <button
-          className={`${ui.btn} ${ui.ghost}`}
-          type="button"
-          onClick={() => {
-            updatePassport(null);
-            setText("{}");
-            setJsonError(null);
-          }}
-        >
-          Skip This Step
-        </button>
+          rows={10}
+          placeholder="Enter your medical information in JSON format..."
+        />
+        <div className={s.jsonStatus}>
+          {jsonError ? (
+            <span className={s.jsonError}>⚠️ {jsonError}</span>
+          ) : (
+            <span className={s.jsonValid}>✓ Valid JSON format</span>
+          )}
+        </div>
       </div>
     </form>
   );

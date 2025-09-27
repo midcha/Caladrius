@@ -1,18 +1,124 @@
-/* Vitals Form styles (light glass card, 3-col grid, pill inputs via ui.input) */
+/* Enhanced Vitals Form styles with animations */
 .card{
   background: var(--panel);
   backdrop-filter: blur(var(--blur));
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
   box-shadow: var(--panel-shadow);
-  padding: 24px;
+  padding: 32px;
   position: relative;
   z-index: 1;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.card:hover {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06), 0 8px 16px rgba(0, 0, 0, 0.04);
+  transform: translateY(-2px);
+}
 
-.actions{ display:flex; gap: 12px; margin-top: 14px; align-items: center; }
+.slideIn {
+  animation: slideInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.header {
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+/* Progress indicator */
+.progress {
+  margin-bottom: 32px;
+  padding: 0;
+}
+
+.progressBar {
+  width: 100%;
+  height: 6px;
+  background-color: rgba(56, 189, 248, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #0891b2, #06b6d4);
+  border-radius: 3px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 10px rgba(8, 145, 178, 0.3);
+}
+
+.progressText {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.grid{ 
+  display: grid; 
+  grid-template-columns: repeat(3, 1fr); 
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+/* Responsive grid */
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .card {
+    padding: 24px 20px;
+  }
+}
+
+.fieldWrapper {
+  animation: fieldFadeIn 0.4s ease-out;
+  transition: transform 0.2s ease;
+}
+
+.fieldWrapper:hover {
+  transform: translateY(-1px);
+}
+
+.fieldWrapper:nth-child(1) { animation-delay: 0.1s; }
+.fieldWrapper:nth-child(2) { animation-delay: 0.15s; }
+.fieldWrapper:nth-child(3) { animation-delay: 0.2s; }
+.fieldWrapper:nth-child(4) { animation-delay: 0.25s; }
+.fieldWrapper:nth-child(5) { animation-delay: 0.3s; }
+.fieldWrapper:nth-child(6) { animation-delay: 0.35s; }
+
+@keyframes fieldFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.actions{ 
+  display: flex; 
+  gap: 12px; 
+  margin-top: 20px; 
+  align-items: center; 
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
 
 /* Input error state overrides */
 .bad{
@@ -23,11 +129,24 @@
 .error{
   color: var(--danger);
   font-size: 12px;
-  margin-top: 4px;
+  margin-top: 6px;
+  font-weight: 500;
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
 }
 
 .hint{
   color: var(--muted);
-  font-size: 12px;
-  margin-top: 6px;
+  font-size: 13px;
+  margin-top: 8px;
+  padding: 12px 16px;
+  background: rgba(255, 193, 7, 0.1);
+  border-radius: 8px;
+  border-left: 3px solid #ffc107;
+  font-weight: 500;
 }
