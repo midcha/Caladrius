@@ -1,0 +1,11 @@
+/* Light glass card wrapper */
+.card, .wrap, .box{
+  background: var(--panel);
+  backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: var(--panel-shadow);
+  padding: 24px;
+}
+.q{ font-size:16px; margin: 0 0 10px; }
+.row{ display:flex; gap:10px; flex-wrap:wrap; }

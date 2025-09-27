@@ -1,0 +1,33 @@
+/* Vitals Form styles (light glass card, 3-col grid, pill inputs via ui.input) */
+.card{
+  background: var(--panel);
+  backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: var(--panel-shadow);
+  padding: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+.actions{ display:flex; gap: 12px; margin-top: 14px; align-items: center; }
+
+/* Input error state overrides */
+.bad{
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 2px rgba(255,77,109,0.18) !important;
+}
+
+.error{
+  color: var(--danger);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.hint{
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 6px;
+}
