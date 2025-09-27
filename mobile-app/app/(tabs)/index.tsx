@@ -1,4 +1,8 @@
 /* app/(tabs)/index.tsx */
+import 'react-native-get-random-values';
+import 'react-native-url-polyfill/auto';
+(global as any).Buffer = (global as any).Buffer || require('buffer').Buffer;
+
 import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Platform, Alert } from 'react-native';
 
@@ -13,13 +17,8 @@ import {
 } from '../../src/fs';
 import { PASSPORT, ATT_DIR, INDEX, buildDemoPassport, buildEmptyIndex } from '../../src/passportStore';
 
-// 1) Polyfill WebCrypto getRandomValues (needed for AWS SigV4)
 import 'react-native-get-random-values';
-
-// 2) Polyfill URL / URLSearchParams (AWS SDK uses them)
 import 'react-native-url-polyfill/auto';
-
-// 3) Ensure global Buffer exists for any Node-style usage
 (global as any).Buffer = (global as any).Buffer || require('buffer').Buffer;
 
 // ---- AWS S3 (direct, IAM creds via .env/Babel) ----
@@ -84,6 +83,11 @@ export default function Home() {
   const [resolvedAttachments, setResolvedAttachments] = useState<
     Array<{ id: string; filename?: string; label?: string; size?: number | null; mime?: string; capturedAt?: string }>
   >([]);
+
+  // ---- NEW: optional context inputs for imports ----
+  const [contextLabel, setContextLabel] = useState<string>('');
+  const [contextTags, setContextTags] = useState<string>('');
+  const [contextSource, setContextSource] = useState<string>('patient-upload');
 
   const log = useCallback((s: string) => {
     console.log(s);
@@ -155,6 +159,11 @@ export default function Home() {
           ? 'application/dicom'
           : 'application/octet-stream';
 
+      // ---- NEW: apply optional context inputs if provided ----
+      const userTags = contextTags
+        ? contextTags.split(',').map(t => t.trim()).filter(Boolean)
+        : [ext];
+
       idx.files.push({
         id,
         filename: `attachments/${id}.${ext}`,
@@ -162,9 +171,9 @@ export default function Home() {
         size: info.size || null,
         capturedAt: new Date().toISOString(),
         context: {
-          label: a.name || `${id}.${ext}`,
-          source: 'patient-upload',
-          tags: [ext],
+          label: contextLabel || a.name || `${id}.${ext}`,
+          source: contextSource || 'patient-upload',
+          tags: userTags,
         },
       });
 
@@ -178,7 +187,7 @@ export default function Home() {
     await writeJson(INDEX, idx);
     await writeJson(PASSPORT, passport);
     await refreshTrees();
-  }, [runId, log, refreshTrees]);
+  }, [runId, contextLabel, contextTags, contextSource, log, refreshTrees]);
 
   const zipRun = useCallback(async () => {
     await ensureDir(ATT_DIR);
@@ -193,8 +202,7 @@ export default function Home() {
 
     log(`Zipping ${staging} → ${out}`);
     const zipped = await zip(staging, out);
-    // IMPORTANT: keep the file:// URI to satisfy expo-file-system APIs
-    setZipPath(out);
+    setZipPath(out); // ensure we keep the file:// URI
     const info = await FileSystem.getInfoAsync(out, { size: true });
     log(`ZIP ready: ${out} (${bytes(info.size)})`);
 
@@ -221,7 +229,6 @@ export default function Home() {
         Alert.alert('File missing', 'ZIP file not found on device.');
         return;
       }
-      // Read ZIP as Base64, convert to Uint8Array for SDK
       const b64 = await FileSystem.readAsStringAsync(zipPath, { encoding: FileSystem.EncodingType.Base64 });
       const bodyBytes = base64ToUint8Array(b64);
 
@@ -473,6 +480,34 @@ export default function Home() {
       {/* Import */}
       <View style={S.card}>
         <Text style={S.h2}>Import into attachments/</Text>
+
+        {/* ---- NEW: optional context inputs for file import ---- */}
+        <Text style={S.h2}>Optional Context</Text>
+        <TextInput
+          style={S.input}
+          value={contextLabel}
+          onChangeText={setContextLabel}
+          autoCapitalize="none"
+          placeholder="Label override (optional)"
+          placeholderTextColor={colors.faint}
+        />
+        <TextInput
+          style={S.input}
+          value={contextTags}
+          onChangeText={setContextTags}
+          autoCapitalize="none"
+          placeholder="Tags (comma-separated, optional)"
+          placeholderTextColor={colors.faint}
+        />
+        <TextInput
+          style={S.input}
+          value={contextSource}
+          onChangeText={setContextSource}
+          autoCapitalize="none"
+          placeholder='Source (default "patient-upload")'
+          placeholderTextColor={colors.faint}
+        />
+
         <View style={S.row}>
           <TouchableOpacity style={S.btn(colors.ok)} onPress={importFiles}>
             <Text style={S.btnText}>Pick & Copy Files</Text>
