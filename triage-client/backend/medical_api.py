@@ -110,7 +110,7 @@ def read_root():
     return {
         "message": "Medical Diagnosis API", 
         "status": "running", 
-        "endpoints": ["/start", "/resume", "/health", "/docs"],
+        "endpoints": ["/start", "/resume", "/confirm", "/health", "/docs"],
         "description": "AI-powered medical diagnosis with interactive questioning"
     }
 
@@ -125,16 +125,32 @@ class ResumeRequest(BaseModel):
     response: str
     question: Optional[str] = None
 
+class ConfirmRequest(BaseModel):
+    thread_id: str
+    confirm: bool
+
 
 def serialize_result(result: dict):
     """Convert graph result to API-friendly format."""
     if isinstance(result, dict) and "__interrupt__" in result:
         payload = result["__interrupt__"][0].value or {}
+        question_type = payload.get("question_type", "multiple_choice")
+
+        # New confirmation interrupt
+        if payload.get("action") == "confirm_diagnosis_complete":
+            return {
+                "type": "confirm",
+                "action": payload.get("action"),
+                "message": payload.get("message", "Proceed to diagnosis? (y/N)"),
+                "status": "awaiting_confirmation",
+            }
+
+        # Regular question interrupt
         return {
             "type": "question",
             "query": payload.get("query"),
             "options": payload.get("options"),
-            "question_type": payload.get("question_type"),
+            "question_type": question_type,
             "status": "waiting_for_response"
         }
     
@@ -248,6 +264,39 @@ def resume_diagnosis(req: ResumeRequest):
         return {
             "type": "error",
             "error": f"Failed to resume diagnosis: {str(e)}",
+            "status": "error"
+        }
+
+
+@app.post("/confirm")
+def confirm_diagnosis(req: ConfirmRequest):
+    """
+    Confirm or cancel proceeding to the final diagnosis after a confirmation interrupt.
+
+    - **thread_id**: The session identifier
+    - **confirm**: true to proceed, false to return to questioning
+    """
+    config = {"configurable": {"thread_id": req.thread_id}}
+
+    try:
+        resume_token = "yes" if req.confirm else "no"
+        result = graph.invoke(Command(resume=resume_token), config=config)
+        payload = serialize_result(result)
+
+        # On final diagnosis, push to MongoDB synchronously
+        if payload.get("type") == "diagnosis":
+            try:
+                diagnosis_payload = payload.get("diagnosis") if isinstance(payload.get("diagnosis"), dict) else {}
+                latest_state = graph.get_state(config)
+                _push_patient_record(req.thread_id, latest_state.values or {}, diagnosis_payload)
+            except Exception:
+                pass
+
+        return payload
+    except Exception as e:
+        return {
+            "type": "error",
+            "error": f"Failed to confirm diagnosis: {str(e)}",
             "status": "error"
         }
 
