@@ -34,7 +34,6 @@ const DifferentialDiagnosisSchema = new Schema<IDifferentialDiagnosis>({
 
 const PatientSchema = new Schema<IPatient>({
   name: { type: String, required: true },
-  age: { type: Number },
   thread_id: {type: String},
   symptoms: { type: String, required: true },
   differential_diagnosis: { type: [DifferentialDiagnosisSchema], required: true },
