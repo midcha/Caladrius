@@ -1,73 +1,160 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTriage } from "./TriageProvider";
+import PassportStart from "./PassportStart";
+import PassportWaiting from "./PassportWaiting";
+import PassportComplete from "./PassportComplete";
+import type { PassportBundle } from "../utils/types";
 import ui from "./ui.module.css";
 import s from "./PassportUploader.module.css";
 
+type OtpPayload = {
+  sessionId: string;
+  address: string;
+  time: number;
+};
+
+const OTP_REFRESH_MS = 60_000;
+const OTP_DURATION_SECONDS = 60;
+
 export default function PassportUploader() {
-  const { updatePassport, patientData } = useTriage();
-  const [text, setText] = useState(
-    '{\n  "allergies": ["penicillin"],\n  "medications": [],\n  "conditions": []\n}'
+  const { passportStage, connectPhone, submitPassport, patientData } = useTriage();
+  const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID());
+  const [otp, setOtp] = useState<OtpPayload>();
+  const [timeLeft, setTimeLeft] = useState<number>(OTP_DURATION_SECONDS);
+  const [uploadedData, setUploadedData] = useState<PassportBundle | undefined>(
+    () => patientData.passportBundle
   );
-  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load existing passport data on mount
+  const hasRequestedBundle = useRef(false);
+
   useEffect(() => {
-    if (patientData.passportData) {
-      setText(JSON.stringify(patientData.passportData, null, 2));
+    if (patientData.passportBundle) {
+      setUploadedData(patientData.passportBundle);
     }
-  }, [patientData.passportData]);
+  }, [patientData.passportBundle]);
 
-  const handle = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const json = JSON.parse(text);
-      updatePassport(json);
-      setJsonError(null);
-    } catch (error) {
-      setJsonError("Invalid JSON format");
+  useEffect(() => {
+    if (passportStage === "complete") {
+      return;
     }
-  };
 
-  const validateJson = (jsonText: string) => {
+    const issueOtp = () => {
+      const newSessionId = crypto.randomUUID();
+      setSessionId(newSessionId);
+      setOtp({
+        sessionId: newSessionId,
+        address: window.location.origin,
+        time: Date.now(),
+      });
+      setTimeLeft(OTP_DURATION_SECONDS);
+      hasRequestedBundle.current = false;
+    };
+
+    issueOtp();
+    const interval = setInterval(issueOtp, OTP_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [passportStage]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const fetchBundle = useCallback(async () => {
     try {
-      JSON.parse(jsonText);
-      setJsonError(null);
-    } catch {
-      setJsonError("Invalid JSON format");
+      setError(null);
+      const res = await fetch(`/api/triage/read?sessionId=${sessionId}`);
+      if (!res.ok) {
+        throw new Error(`Failed to read bundle (${res.status})`);
+      }
+      const data = (await res.json()) as PassportBundle;
+      setUploadedData(data);
+      submitPassport(data);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Unknown error fetching bundle";
+      setError(message);
     }
-  };
+  }, [sessionId, submitPassport]);
+
+  useEffect(() => {
+    if (!sessionId || passportStage === "complete") return;
+
+    const evtSource = new EventSource(`/api/triage/events?sessionId=${sessionId}`);
+
+    evtSource.onmessage = (event) => {
+      if (event.data === "PHONE_CONNECTED") {
+        connectPhone();
+      }
+
+      if (event.data === "BUNDLE_READY" && !hasRequestedBundle.current) {
+        hasRequestedBundle.current = true;
+        fetchBundle().finally(() => {
+          hasRequestedBundle.current = false;
+        });
+      }
+    };
+
+    evtSource.onerror = (err) => {
+      console.error("SSE failed:", err);
+      evtSource.close();
+    };
+
+    return () => evtSource.close();
+  }, [sessionId, passportStage, connectPhone, fetchBundle]);
+
+  const renderContent = useMemo(() => {
+    if (passportStage === "start") {
+      return <PassportStart otp={otp} timeLeft={timeLeft} />;
+    }
+
+    if (passportStage === "waiting") {
+      return <PassportWaiting />;
+    }
+
+    if (passportStage === "complete" && uploadedData) {
+      return <PassportComplete data={uploadedData} />;
+    }
+
+    if (passportStage === "complete") {
+      return (
+        <div className={s.card} style={{ textAlign: "center" }}>
+          <p className={ui.kicker}>Step 2</p>
+          <h2 className={ui.title}>Upload received</h2>
+          <p className={ui.sub}>
+            We&apos;re processing the uploaded bundle. Please try again if nothing
+            appears.
+          </p>
+        </div>
+      );
+    }
+
+    return null;
+  }, [passportStage, otp, timeLeft, uploadedData]);
 
   return (
-    <form onSubmit={handle} className={`${s.card} ${s.slideIn}`}>
-      <div className={s.header}>
-        <p className={ui.kicker}>Step 2 of 3</p>
-        <h2 className={ui.title}>Medical History</h2>
-        <p className={ui.sub}>
-          Upload your medical passport or enter your medical information. This helps us provide more accurate assessments.
-        </p>
-      </div>
-      
-      <div className={s.textareaWrapper}>
-        <textarea
-          className={`${ui.input} ${s.textarea} ${jsonError ? s.error : ''}`}
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            validateJson(e.target.value);
+    <div className={s.slideIn}>
+      {renderContent}
+      {error && (
+        <div
+          className={ui.panel}
+          style={{
+            marginTop: "1rem",
+            border: "1px solid rgba(220,38,38,0.2)",
+            color: "#dc2626",
           }}
-          rows={10}
-          placeholder="Enter your medical information in JSON format..."
-        />
-        <div className={s.jsonStatus}>
-          {jsonError ? (
-            <span className={s.jsonError}>⚠️ {jsonError}</span>
-          ) : (
-            <span className={s.jsonValid}>✓ Valid JSON format</span>
-          )}
+        >
+          <strong style={{ display: "block", marginBottom: 4 }}>
+            Couldn&apos;t fetch upload
+          </strong>
+          <span style={{ fontSize: "0.9rem", lineHeight: 1.4 }}>{error}</span>
         </div>
-      </div>
-    </form>
+      )}
+    </div>
   );
 }

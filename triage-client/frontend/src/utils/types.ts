@@ -38,9 +38,17 @@ export type ApiError = {
 export type ApiResponse = BackendQuestion | BackendConfirm | DiagnosisResult | ApiError;
 
 // Unified patient data structure
+export type PassportBundle = {
+  json: unknown;
+  images: Record<string, string>;
+};
+
+export type PassportStage = "start" | "waiting" | "complete";
+
 export type PatientData = {
   vitals?: Vitals;
   passportData?: unknown;
+  passportBundle?: PassportBundle;
   symptoms: string[];
   medicalRecords?: string;
 };

@@ -9,13 +9,15 @@ import {
   useRef,
   useState,
 } from "react";
-import type { 
-  BackendQuestion, 
-  TriagePhase, 
-  Vitals, 
-  PatientData, 
-  DiagnosisResult, 
-  ApiResponse 
+import type {
+  BackendQuestion,
+  TriagePhase,
+  Vitals,
+  PatientData,
+  DiagnosisResult,
+  ApiResponse,
+  PassportBundle,
+  PassportStage,
 } from "../utils/types";
 import { medicalApi } from "../utils/api";
 
@@ -23,6 +25,7 @@ import { medicalApi } from "../utils/api";
 interface Ctx {
   sessionId?: string;
   phase: TriagePhase;
+  passportStage: PassportStage;
   currentQuestion?: BackendQuestion;
   diagnosis?: DiagnosisResult;
   confirmMessage?: string;
@@ -32,10 +35,13 @@ interface Ctx {
   
   // Data collection methods
   updateVitals: (vitals: Vitals) => void;
-  updatePassport: (data: unknown) => void;
+  updatePassport: (data: unknown, bundle?: PassportBundle) => void;
   updateSymptoms: (symptoms: string[]) => void;
   updateMedicalRecords: (records: string) => void;
   
+  connectPhone: () => void;
+  submitPassport: (bundle: PassportBundle) => void;
+
   // Navigation methods
   nextStep: () => void;
   previousStep: () => void;
@@ -60,6 +66,7 @@ export const useTriage = () => {
 export default function TriageProvider({ children }: { children: React.ReactNode }) {
   const [sessionId, setSessionId] = useState<string>();
   const [phase, setPhase] = useState<TriagePhase>("vitals");
+  const [passportStage, setPassportStage] = useState<PassportStage>("start");
   const [busy, setBusy] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState<BackendQuestion>();
   const [diagnosis, setDiagnosis] = useState<DiagnosisResult>();
@@ -79,9 +86,16 @@ export default function TriageProvider({ children }: { children: React.ReactNode
     setPatientData(prev => ({ ...prev, vitals }));
   }, []);
 
-  const updatePassport = useCallback((data: unknown) => {
-    setPatientData(prev => ({ ...prev, passportData: data }));
-  }, []);
+  const updatePassport = useCallback(
+    (data: unknown, bundle?: PassportBundle) => {
+      setPatientData((prev) => ({
+        ...prev,
+        passportData: data,
+        passportBundle: bundle ?? prev.passportBundle,
+      }));
+    },
+    []
+  );
 
   const updateSymptoms = useCallback((symptoms: string[]) => {
     setPatientData(prev => ({ ...prev, symptoms }));
@@ -91,14 +105,34 @@ export default function TriageProvider({ children }: { children: React.ReactNode
     setPatientData(prev => ({ ...prev, medicalRecords: records }));
   }, []);
 
+  const connectPhone = useCallback(() => {
+    setPassportStage("waiting");
+  }, []);
+
+  const submitPassport = useCallback(
+    (bundle: PassportBundle) => {
+      updatePassport(bundle.json, bundle);
+      setPassportStage("complete");
+    },
+    [updatePassport]
+  );
+
   // Navigation methods
   const nextStep = useCallback(() => {
     switch (phase) {
-      case "vitals":
+      case "vitals": {
         setPhase("passport");
+        setPassportStage((prev) =>
+          prev === "complete" || patientData.passportBundle
+            ? "complete"
+            : "start"
+        );
         break;
+      }
       case "passport":
-        setPhase("symptoms");
+        if (passportStage === "complete") {
+          setPhase("symptoms");
+        }
         break;
       case "symptoms":
         // Don't auto-start diagnosis, let user click start button
@@ -106,7 +140,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       default:
         break;
     }
-  }, [phase]);
+  }, [phase, passportStage, patientData.passportBundle]);
 
   const previousStep = useCallback(() => {
     switch (phase) {
@@ -126,7 +160,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       case "vitals":
         return !!patientData.vitals;
       case "passport":
-        return true; // Passport is optional
+        return passportStage === "complete";
       case "symptoms":
         return patientData.symptoms.length > 0;
       default:
@@ -241,6 +275,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
   const reset = useCallback(() => {
     setSessionId(undefined);
     setPhase("vitals");
+    setPassportStage("start");
     setBusy(false);
     setCurrentQuestion(undefined);
     setDiagnosis(undefined);
@@ -253,9 +288,10 @@ export default function TriageProvider({ children }: { children: React.ReactNode
     () => ({
       sessionId,
       phase,
+      passportStage,
       currentQuestion,
       diagnosis,
-  confirmMessage,
+      confirmMessage,
       patientData,
       error,
       busy,
@@ -263,6 +299,8 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       updatePassport,
       updateSymptoms,
       updateMedicalRecords,
+      connectPhone,
+      submitPassport,
       nextStep,
       previousStep,
       canGoNext,
@@ -275,9 +313,10 @@ export default function TriageProvider({ children }: { children: React.ReactNode
     [
       sessionId,
       phase,
+      passportStage,
       currentQuestion,
       diagnosis,
-  confirmMessage,
+      confirmMessage,
       patientData,
       error,
       busy,
@@ -285,6 +324,8 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       updatePassport,
       updateSymptoms,
       updateMedicalRecords,
+      connectPhone,
+      submitPassport,
       nextStep,
       previousStep,
       canGoNext,
