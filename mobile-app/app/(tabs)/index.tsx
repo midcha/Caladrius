@@ -3,12 +3,15 @@ import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 (global as any).Buffer = (global as any).Buffer || require('buffer').Buffer;
 
-import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Platform, Alert } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Platform, Alert, Modal } from 'react-native';
 
 import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import { zip } from 'react-native-zip-archive';
+
+/* SWAP: use expo-camera instead of expo-barcode-scanner */
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { colors, S } from '../../src/styles';
 import {
@@ -16,10 +19,6 @@ import {
   listTree, bytes, guessExt, copyDirRecursive, type Node
 } from '../../src/fs';
 import { PASSPORT, ATT_DIR, INDEX, buildDemoPassport, buildEmptyIndex } from '../../src/passportStore';
-
-import 'react-native-get-random-values';
-import 'react-native-url-polyfill/auto';
-(global as any).Buffer = (global as any).Buffer || require('buffer').Buffer;
 
 // ---- AWS S3 (direct, IAM creds via .env/Babel) ----
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -73,7 +72,8 @@ function base64ToUint8Array(b64: string) {
 
 export default function Home() {
   const [runId, setRunId] = useState(makeRunId()); // only for ZIP filename
-  const [sessionId, setSessionId] = useState<string>(''); // user-entered session id for S3 prefix
+  const [sessionId, setSessionId] = useState<string>(''); // user-entered or QR-populated session id (S3 prefix)
+  const [address, setAddress] = useState<string>(''); // QR-populated server address (kept in-memory)
   const [zipPath, setZipPath] = useState<string | null>(null);
   const [docTree, setDocTree] = useState<Node[]>([]);
   const [cacheTree, setCacheTree] = useState<Node[]>([]);
@@ -84,10 +84,17 @@ export default function Home() {
     Array<{ id: string; filename?: string; label?: string; size?: number | null; mime?: string; capturedAt?: string }>
   >([]);
 
-  // ---- NEW: optional context inputs for imports ----
+  // ---- OPTIONAL CONTEXT INPUTS FOR IMPORTS ----
   const [contextLabel, setContextLabel] = useState<string>('');
   const [contextTags, setContextTags] = useState<string>('');
   const [contextSource, setContextSource] = useState<string>('patient-upload');
+
+  // ---- QR Scanner (expo-camera) ----
+  const [scanOpen, setScanOpen] = useState(false);
+  const [perm, requestPermission] = useCameraPermissions();
+  const hasCamPerm = perm?.granted ?? null;
+
+  useEffect(() => { if (!perm) requestPermission(); }, [perm, requestPermission]);
 
   const log = useCallback((s: string) => {
     console.log(s);
@@ -159,7 +166,6 @@ export default function Home() {
           ? 'application/dicom'
           : 'application/octet-stream';
 
-      // ---- NEW: apply optional context inputs if provided ----
       const userTags = contextTags
         ? contextTags.split(',').map(t => t.trim()).filter(Boolean)
         : [ext];
@@ -202,7 +208,7 @@ export default function Home() {
 
     log(`Zipping ${staging} → ${out}`);
     const zipped = await zip(staging, out);
-    setZipPath(out); // ensure we keep the file:// URI
+    setZipPath(out); // keep the file:// URI for expo-file-system
     const info = await FileSystem.getInfoAsync(out, { size: true });
     log(`ZIP ready: ${out} (${bytes(info.size)})`);
 
@@ -218,7 +224,7 @@ export default function Home() {
         return;
       }
       if (!sessionId || !sessionId.trim()) {
-        Alert.alert('Missing Session ID', 'Enter a sessionId to use as the S3 subdirectory.');
+        Alert.alert('Missing Session ID', 'Enter a sessionId (or scan QR) to use as the S3 subdirectory.');
         return;
       }
 
@@ -257,6 +263,7 @@ export default function Home() {
           size: stat.size,
           contentType: 'application/zip'
         },
+        // address kept in-memory only for now
         app: { name: 'caladrius', version: '1.0' }
       };
 
@@ -369,6 +376,26 @@ export default function Home() {
     log(`Resolved ${out.length} attachment references`);
   }, [log]);
 
+  // === QR scan handler (expects JSON: { sessionId, address, ... }) ===
+  const onScan = useCallback(({ data }: { data: string }) => {
+    try {
+      const obj = JSON.parse(data);
+      const sid = typeof obj?.sessionId === 'string' ? obj.sessionId : '';
+      const addr = typeof obj?.address === 'string' ? obj.address : '';
+      if (!sid && !addr) throw new Error('QR JSON missing sessionId/address');
+
+      if (sid) setSessionId(sid);
+      if (addr) setAddress(addr);
+
+      log(`QR parsed → sessionId=${sid || '(none)'} address=${addr || '(none)'}`);
+      setScanOpen(false); // one-shot
+    } catch (e: any) {
+      log(`QR parse error: ${e?.message || String(e)}`);
+      Alert.alert('QR Error', 'Expecting JSON with { "sessionId", "address" }.');
+      setScanOpen(false);
+    }
+  }, [log]);
+
   // ===================== UI =====================
   return (
     <ScrollView
@@ -381,6 +408,7 @@ export default function Home() {
       <View style={S.card}>
         <Text style={S.h2}>Snapshot ID (for ZIP filename only)</Text>
         <TextInput style={S.input} value={runId} onChangeText={setRunId} autoCapitalize="none" />
+
         <Text style={[S.h2, { marginTop: 12 }]}>Session ID (S3 subdirectory)</Text>
         <TextInput
           style={S.input}
@@ -390,6 +418,17 @@ export default function Home() {
           placeholder="e.g., 123456 (required for S3 upload)"
           placeholderTextColor={colors.faint}
         />
+
+        <Text style={[S.h2, { marginTop: 12 }]}>Server Address</Text>
+        <TextInput
+          style={S.input}
+          value={address}
+          onChangeText={setAddress}
+          autoCapitalize="none"
+          placeholder="address (from QR)"
+          placeholderTextColor={colors.faint}
+        />
+
         <View style={S.row}>
           <TouchableOpacity style={S.btn(colors.accent)} onPress={newRun}>
             <Text style={S.btnText}>New Snapshot ID</Text>
@@ -399,6 +438,12 @@ export default function Home() {
           </TouchableOpacity>
           <TouchableOpacity style={S.btn(colors.warn)} onPress={resetStage}>
             <Text style={S.btnText}>Reset Passport + Attachments</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[S.row, { marginTop: 10 }]}>
+          <TouchableOpacity style={S.btn(colors.accent)} onPress={() => setScanOpen(true)}>
+            <Text style={S.btnText}>Scan QR (Session + Address)</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -481,7 +526,7 @@ export default function Home() {
       <View style={S.card}>
         <Text style={S.h2}>Import into attachments/</Text>
 
-        {/* ---- NEW: optional context inputs for file import ---- */}
+        {/* Optional Context */}
         <Text style={S.h2}>Optional Context</Text>
         <TextInput
           style={S.input}
@@ -578,6 +623,33 @@ export default function Home() {
           ))}
         </ScrollView>
       </View>
+
+      {/* QR Scanner Modal (expo-camera) */}
+      <Modal visible={scanOpen} animationType="slide" onRequestClose={() => setScanOpen(false)}>
+        <View style={[S.screen, { justifyContent: 'center', alignItems: 'center' }]}>
+          {hasCamPerm === false ? (
+            <>
+              <Text style={S.h2}>Camera permission denied</Text>
+              <TouchableOpacity style={S.btn(colors.warn)} onPress={() => setScanOpen(false)}>
+                <Text style={S.btnText}>Close</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={{ width: '100%', aspectRatio: 3 / 4, overflow: 'hidden', borderRadius: 12 }}>
+                <CameraView
+                  style={{ width: '100%', height: '100%' }}
+                  barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                  onBarcodeScanned={({ data }: any) => onScan({ data })}
+                />
+              </View>
+              <TouchableOpacity style={[S.btn(colors.warn), { marginTop: 16 }]} onPress={() => setScanOpen(false)}>
+                <Text style={S.btnText}>Cancel</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
