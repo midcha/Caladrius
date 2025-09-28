@@ -119,6 +119,27 @@ class MedicalApiClient {
       }
     }
 
+    if (patientData.passportAttachments?.length) {
+      const formatted = patientData.passportAttachments.map((attachment, index) => {
+        const name = attachment.context?.ogFileName || attachment.filename;
+        const details: string[] = [];
+
+        if (attachment.context?.description) {
+          details.push(`Description: ${attachment.context.description}`);
+        }
+        if (attachment.context?.source) {
+          details.push(`Source: ${attachment.context.source}`);
+        }
+        if (attachment.context?.tags?.length) {
+          details.push(`Tags: ${attachment.context.tags.join(', ')}`);
+        }
+
+        return `Attachment ${index + 1}: ${name}${details.length ? ` (${details.join('; ')})` : ''}`;
+      });
+
+      records.push(`Uploaded Attachments:\n${formatted.join('\n')}`);
+    }
+
     // Add any additional medical records
     if (patientData.medicalRecords) {
       records.push(patientData.medicalRecords);

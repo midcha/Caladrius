@@ -3,11 +3,18 @@ import { readZip } from "../../../../../lib/s3";
 
 export async function GET(req: NextRequest) {
   try {
-    const key = "runs/stuff.zip";
     const url = new URL(req.url);
     const sessionId = url.searchParams.get("sessionId");
+    if (!sessionId) {
+      return NextResponse.json(
+        { error: "Missing sessionId" },
+        { status: 400 }
+      );
+    }
 
-    const { json, images } = await readZip(key);
+    const key = `runs/${sessionId}/bundle.zip`;
+
+  const { json, images, attachments } = await readZip(key);
 
     const imagesBase64: Record<string, string> = {};
     for (const [filename, buffer] of Object.entries(images)) {
@@ -17,6 +24,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       json,
       images: imagesBase64,
+      attachments,
     });
   } catch (err: unknown) {
     console.error(err);

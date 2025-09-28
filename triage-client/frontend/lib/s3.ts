@@ -14,9 +14,26 @@ export const s3 = new S3Client({
   },
 });
 
+export interface AttachmentContext {
+  ogFileName?: string;
+  description?: string;
+  source?: string;
+  tags?: string[];
+}
+
+export interface AttachmentMetadata {
+  id: string;
+  filename: string;
+  mime?: string;
+  size?: number;
+  capturedAt?: string;
+  context?: AttachmentContext;
+}
+
 interface ZipContents {
-  json: { name: string } | null;
+  json: unknown | null;
   images: Record<string, Buffer>;
+  attachments: AttachmentMetadata[];
 }
 
 export async function readZip(key: string): Promise<ZipContents> {
@@ -34,20 +51,35 @@ export async function readZip(key: string): Promise<ZipContents> {
 
   const directory = await unzipper.Open.buffer(zipBuffer);
 
-  const result: ZipContents = { json: null, images: {} };
+  const result: ZipContents = { json: null, images: {}, attachments: [] };
+  const imageExtensions = [".jpeg", ".jpg", ".png", ".webp", ".gif"];
 
   for (const file of directory.files) {
     if (file.type !== "File") continue;
     const content = await file.buffer();
 
     if (file.path.endsWith(".json")) {
-      result.json = JSON.parse(content.toString("utf-8"));
-    } else if (
-      file.path.endsWith(".jpeg") ||
-      file.path.endsWith(".jpg") ||
-      file.path.endsWith(".png")
-    ) {
-      result.images[file.path] = content;
+      const parsed = JSON.parse(content.toString("utf-8"));
+      if (file.path === "passport.json") {
+        result.json = parsed;
+      } else if (file.path === "attachments/index.json") {
+        const files = Array.isArray(parsed?.files) ? parsed.files : [];
+        result.attachments = files.map((item: any) => ({
+          id: item?.id,
+          filename: item?.filename,
+          mime: item?.mime,
+          size: item?.size,
+          capturedAt: item?.capturedAt,
+          context: item?.context,
+        }));
+      } else if (!result.json) {
+        result.json = parsed;
+      }
+    } else {
+      const lowered = file.path.toLowerCase();
+      if (imageExtensions.some((ext) => lowered.endsWith(ext))) {
+        result.images[file.path] = content;
+      }
     }
   }
 

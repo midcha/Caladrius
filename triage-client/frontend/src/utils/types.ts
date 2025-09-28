@@ -41,6 +41,21 @@ export type ApiResponse = BackendQuestion | BackendConfirm | DiagnosisResult | A
 export type PassportBundle = {
   json: unknown;
   images: Record<string, string>;
+  attachments: PassportAttachment[];
+};
+
+export type PassportAttachment = {
+  id?: string;
+  filename: string;
+  mime?: string;
+  size?: number;
+  capturedAt?: string;
+  context?: {
+    ogFileName?: string;
+    description?: string;
+    source?: string;
+    tags?: string[];
+  };
 };
 
 export type PassportStage = "start" | "waiting" | "complete";
@@ -49,6 +64,7 @@ export type PatientData = {
   vitals?: Vitals;
   passportData?: unknown;
   passportBundle?: PassportBundle;
+  passportAttachments?: PassportAttachment[];
   symptoms: string[];
   medicalRecords?: string;
 };
@@ -56,6 +72,8 @@ export type PatientData = {
 export type TriagePhase =
   | "vitals"     // Step 1: Collecting vitals
   | "passport"   // Step 2: Medical history/passport
+  | "passportConfirm" // Step 2b: Confirm extracted passport details
+  | "passportReview" // Step 2c: Review medical records from passport
   | "symptoms"   // Step 3: Symptoms input
   | "processing" // Sending data to backend and processing
   | "prompt"     // Waiting for user response to diagnostic question

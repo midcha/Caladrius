@@ -18,8 +18,10 @@ import type {
   ApiResponse,
   PassportBundle,
   PassportStage,
+  PassportAttachment,
 } from "../utils/types";
 import { medicalApi } from "../utils/api";
+import { extractPatientName } from "../utils/passport";
 
 // ---- Context
 interface Ctx {
@@ -92,6 +94,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
         ...prev,
         passportData: data,
         passportBundle: bundle ?? prev.passportBundle,
+        passportAttachments: bundle?.attachments ?? prev.passportAttachments,
       }));
     },
     []
@@ -131,8 +134,14 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       }
       case "passport":
         if (passportStage === "complete") {
-          setPhase("symptoms");
+          setPhase("passportConfirm");
         }
+        break;
+      case "passportConfirm":
+        setPhase("passportReview");
+        break;
+      case "passportReview":
+        setPhase("symptoms");
         break;
       case "symptoms":
         // Don't auto-start diagnosis, let user click start button
@@ -147,8 +156,14 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       case "passport":
         setPhase("vitals");
         break;
-      case "symptoms":
+      case "passportConfirm":
         setPhase("passport");
+        break;
+      case "symptoms":
+        setPhase("passportReview");
+        break;
+      case "passportReview":
+        setPhase("passportConfirm");
         break;
       default:
         break;
@@ -161,15 +176,28 @@ export default function TriageProvider({ children }: { children: React.ReactNode
         return !!patientData.vitals;
       case "passport":
         return passportStage === "complete";
+      case "passportConfirm": {
+        const passportJson =
+          patientData.passportBundle?.json ?? patientData.passportData;
+        const extracted = extractPatientName(passportJson);
+        return !!extracted || !!patientData.passportBundle;
+      }
+      case "passportReview":
+        return !!patientData.passportBundle;
       case "symptoms":
         return patientData.symptoms.length > 0;
       default:
         return false;
     }
-  }, [phase, patientData]);
+  }, [phase, patientData, passportStage]);
 
   const canGoPrevious = useCallback(() => {
-    return phase === "passport" || phase === "symptoms";
+    return (
+      phase === "passport" ||
+      phase === "passportConfirm" ||
+      phase === "passportReview" ||
+      phase === "symptoms"
+    );
   }, [phase]);
 
   // Start diagnosis with all collected data

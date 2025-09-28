@@ -9,6 +9,8 @@ import StepTransition from "./StepTransition";
 import LoadingAnimation from "./LoadingAnimation";
 import ui from "./ui.module.css";
 import { ConfirmPanel } from "./ConfirmPanel";
+import ConfirmName from "./ConfirmName";
+import PassportComplete from "./PassportComplete";
 
 export default function TriageFlow() {
   const { 
@@ -20,19 +22,23 @@ export default function TriageFlow() {
     nextStep, 
     previousStep, 
     canGoNext, 
-    canGoPrevious 
+    canGoPrevious,
+    patientData,
   } = useTriage();
 
   const getStepNumber = () => {
     switch (phase) {
       case "vitals": return 1;
-      case "passport": return 2;
+      case "passport":
+      case "passportConfirm":
+      case "passportReview":
+        return 2;
       case "symptoms": return 3;
       default: return 0;
     }
   };
 
-  const showSteps = ["vitals", "passport", "symptoms"].includes(phase);
+  const showSteps = ["vitals", "passport", "passportConfirm", "passportReview", "symptoms"].includes(phase);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -76,12 +82,63 @@ export default function TriageFlow() {
             onPrevious={previousStep}
             canGoNext={canGoNext()}
             canGoPrevious={canGoPrevious()}
-            nextLabel="Next: Symptoms"
+            nextLabel="Next: Confirm Name"
             previousLabel="Back: Vitals"
           />
         </div>
       )}
       
+      {/* Step 2.5: Confirm Name */}
+      {phase === "passportConfirm" && (
+        <div>
+          <StepTransition
+            isLoading={busy}
+            loadingMessage="Double-checking your profile..."
+            variant="heartbeat"
+          >
+            <ConfirmName />
+          </StepTransition>
+          <NavigationButtons
+            onNext={nextStep}
+            onPrevious={previousStep}
+            canGoNext={canGoNext()}
+            canGoPrevious={canGoPrevious()}
+            nextLabel="Yes, show my records"
+            previousLabel="Back: Medical History"
+          />
+        </div>
+      )}
+
+      {/* Step 2.75: Review Passport Data */}
+      {phase === "passportReview" && (
+        <div>
+          <StepTransition
+            isLoading={busy}
+            loadingMessage="Preparing your medical records..."
+            variant="pulse"
+          >
+            {patientData.passportBundle ? (
+              <PassportComplete data={patientData.passportBundle} />
+            ) : (
+              <div className={ui.panel}>
+                <p className={ui.kicker}>Medical Records</p>
+                <p className={ui.sub}>
+                  We couldn&apos;t load your medical records. Please go back and try uploading again.
+                </p>
+              </div>
+            )}
+          </StepTransition>
+          <NavigationButtons
+            onNext={nextStep}
+            onPrevious={previousStep}
+            canGoNext={canGoNext()}
+            canGoPrevious={canGoPrevious()}
+            nextLabel="Next: Symptoms"
+            previousLabel="Back: Confirm Name"
+          />
+        </div>
+      )}
+
       {/* Step 3: Symptoms */}
       {phase === "symptoms" && (
         <div>
@@ -95,7 +152,7 @@ export default function TriageFlow() {
           <NavigationButtons 
             onPrevious={previousStep}
             canGoPrevious={canGoPrevious()}
-            previousLabel="Back: Medical History"
+            previousLabel="Back: Medical Records"
             showNext={false}
           />
         </div>
