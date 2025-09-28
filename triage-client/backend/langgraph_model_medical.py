@@ -144,7 +144,7 @@ def agent_node(state: State):
         coverage_guidance += "STRATEGY: Focus on symptom assessment while gathering essential medical context.\n"
     coverage_guidance += history_guidance
         
-    max_questions = 6
+    max_questions = 5
     min_questions_threshold = 3
         
     # Balanced completion criteria requiring both symptom and history assessment
