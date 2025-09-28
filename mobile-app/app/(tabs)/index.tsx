@@ -10,7 +10,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import { zip } from 'react-native-zip-archive';
 
-/* SWAP: use expo-camera instead of expo-barcode-scanner */
+/* QR scanning via expo-camera */
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { colors, S } from '../../src/styles';
@@ -47,6 +47,25 @@ function deepMerge<T>(base: T, patch: any): T {
     return out;
   }
   return patch as any;
+}
+
+// ---- HTTP helper (for connect/complete routes) ----
+async function postJSON(base: string, path: string, body: any, timeoutMs = 8000) {
+  const url = `${base.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    try { return await res.json(); } catch { return null; }
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 // ---- AWS helpers ----
@@ -276,12 +295,22 @@ export default function Home() {
       }));
       log('Manifest uploaded');
 
+      // >>> TRIAGE COMPLETE NOTIFY <<<
+      if (address && sessionId) {
+        try {
+          await postJSON(address, '/api/triage/complete', { sessionId });
+          log('Notified server: /api/triage/complete');
+        } catch (err: any) {
+          log(`Notify /api/triage/complete failed: ${err?.message || String(err)}`);
+        }
+      }
+
       Alert.alert('Upload complete', `s3://${bucket}/runs/${sessionId}/`);
     } catch (e: any) {
       log(`Upload error: ${e?.message || String(e)}`);
       Alert.alert('Upload error', e?.message || String(e));
     }
-  }, [zipPath, sessionId, log]);
+  }, [zipPath, sessionId, address, log]);
 
   const browse = useCallback(async () => {
     await refreshTrees();
@@ -388,6 +417,14 @@ export default function Home() {
       if (addr) setAddress(addr);
 
       log(`QR parsed → sessionId=${sid || '(none)'} address=${addr || '(none)'}`);
+
+      // >>> TRIAGE CONNECT NOTIFY <<<
+      if (sid && addr) {
+        postJSON(addr, '/api/triage/connect', { sessionId: sid })
+          .then(() => log('Notified server: /api/triage/connect'))
+          .catch((err) => log(`Notify /api/triage/connect failed: ${err?.message || String(err)}`));
+      }
+
       setScanOpen(false); // one-shot
     } catch (e: any) {
       log(`QR parse error: ${e?.message || String(e)}`);
