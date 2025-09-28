@@ -4,7 +4,7 @@ import 'react-native-url-polyfill/auto';
 (global as any).Buffer = (global as any).Buffer || require('buffer').Buffer;
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Modal } from 'react-native';
 
 import * as FileSystem from 'expo-file-system/legacy';
 import { zip } from 'react-native-zip-archive';
@@ -15,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 /* Styles & FS helpers (ground truth) */
 import { colors, S } from '../../src/styles';
 import {
-  DOC_ROOT, CACHE_ROOT, ensureDir, bytes, copyDirRecursive, writeJson
+  DOC_ROOT, CACHE_ROOT, ensureDir, bytes, copyDirRecursive, writeJson, readJson
 } from '../../src/fs';
 import { PASSPORT, ATT_DIR, INDEX, buildDemoPassport, buildEmptyIndex } from '../../src/passportStore';
 
@@ -79,6 +79,7 @@ export default function Home() {
   const [sessionId, setSessionId] = useState<string>(''); // from QR
   const [address, setAddress] = useState<string>('');      // from QR
   const [zipPath, setZipPath] = useState<string | null>(null);
+  const [passport, setPassport] = useState<any>(null);
 
   const [status, setStatus] = useState<string>('Ready');
   const setStep = (s: string) => {
@@ -93,6 +94,21 @@ export default function Home() {
   const hasCamPerm = perm?.granted ?? null;
   useEffect(() => { if (!perm) requestPermission(); }, [perm, requestPermission]);
 
+  // Load passport data for display
+  const loadPassportData = useCallback(async () => {
+    try {
+      const data = await readJson<any>(PASSPORT);
+      setPassport(data);
+    } catch {
+      setPassport(null);
+    }
+  }, []);
+
+  // Load passport on mount
+  useEffect(() => {
+    loadPassportData();
+  }, [loadPassportData]);
+
   // ---- Ensure files exist (exactly like admin initStage) ----
   const ensureFilesExist = useCallback(async () => {
     setStep(`INIT (ensuring files exist)`);
@@ -102,7 +118,8 @@ export default function Home() {
     if (!pInfo.exists) await writeJson(PASSPORT, buildDemoPassport(runId));
     if (!iInfo.exists) await writeJson(INDEX, buildEmptyIndex(runId));
     setStep('Seeded passport.json + attachments/index.json');
-  }, [runId, setStep]);
+    await loadPassportData(); // Refresh passport display
+  }, [runId, setStep, loadPassportData]);
 
   // ---- Create ZIP and return path directly ----
   const createZipAndReturnPath = useCallback(async (): Promise<string> => {
@@ -192,7 +209,7 @@ export default function Home() {
     }
   }, [setStep]);
 
-  // ---- QR scan handler (fixed version) ----
+  // ---- QR scan handler (EXACT original working version) ----
   const onScan = useCallback(async ({ data }: { data: string }) => {
     if (scanBusy) return;
     setScanBusy(true);
@@ -229,27 +246,160 @@ export default function Home() {
     }
   }, [scanBusy, createZipAndReturnPath, uploadZipWithPath, setStep]);
 
-  // ===================== UI (clean user interface) =====================
-  return (
-    <View style={S.screen}>
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 }}>
-        <Text style={[S.h1, { textAlign: 'center', marginBottom: 40 }]}>Ready to Send Data</Text>
-        
-        <TouchableOpacity 
-          style={[S.btn(colors.accent), { paddingVertical: 20, paddingHorizontal: 40, borderRadius: 12 }]}
-          onPress={async () => {
-            await ensureFilesExist();
-            setScanOpen(true);
-          }}
-        >
-          <Text style={[S.btnText, { fontSize: 18 }]}>Scan QR Code</Text>
-        </TouchableOpacity>
+  // Helper to format dates
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return 'Not provided';
+    try {
+      return new Date(dateStr).toLocaleDateString();
+    } catch {
+      return dateStr;
+    }
+  };
 
-        {status !== 'Ready' && (
-          <Text style={[S.mono, { marginTop: 20, textAlign: 'center', color: colors.accent }]}>
-            {status}
+  // ===================== UI (patient info layout) =====================
+  return (
+    <ScrollView style={S.screen} showsVerticalScrollIndicator={true}>
+      <View style={{ paddingHorizontal: 20, paddingVertical: 20 }}>
+        
+        {/* Header with patient name */}
+        <View style={{ marginBottom: 30, alignItems: 'center' }}>
+          <Text style={[S.h1, { textAlign: 'center', marginBottom: 20 }]}>
+            Hello, {passport?.patient?.firstName || 'Patient'} {passport?.patient?.lastName || ''}
           </Text>
-        )}
+          
+          <TouchableOpacity 
+            style={[S.btn(colors.accent), { paddingVertical: 20, paddingHorizontal: 40, borderRadius: 12 }]}
+            onPress={async () => {
+              await ensureFilesExist();
+              setScanOpen(true);
+            }}
+          >
+            <Text style={[S.btnText, { fontSize: 18 }]}>Scan to Upload</Text>
+          </TouchableOpacity>
+
+          {status !== 'Ready' && (
+            <Text style={[S.mono, { marginTop: 15, textAlign: 'center', color: colors.accent }]}>
+              {status}
+            </Text>
+          )}
+        </View>
+
+        {/* Basic Information Module */}
+        <View style={[S.card, { marginBottom: 20 }]}>
+          <Text style={[S.h2, { marginBottom: 15 }]}>Basic Information</Text>
+          
+          <View style={{ gap: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={[S.mono, { color: colors.faint }]}>Date of Birth:</Text>
+              <Text style={S.mono}>{formatDate(passport?.patient?.dob)}</Text>
+            </View>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={[S.mono, { color: colors.faint }]}>Sex:</Text>
+              <Text style={S.mono}>{passport?.patient?.sex || 'Not provided'}</Text>
+            </View>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={[S.mono, { color: colors.faint }]}>Blood Type:</Text>
+              <Text style={S.mono}>{passport?.patient?.bloodType || 'Not provided'}</Text>
+            </View>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={[S.mono, { color: colors.faint }]}>Ethnicity:</Text>
+              <Text style={S.mono}>{passport?.patient?.ethnicity || 'Not provided'}</Text>
+            </View>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={[S.mono, { color: colors.faint }]}>MRN:</Text>
+              <Text style={S.mono}>{passport?.patient?.mrn || 'Not provided'}</Text>
+            </View>
+
+            {(passport?.patient?.contact?.phone || passport?.patient?.contact?.email) && (
+              <>
+                <View style={{ height: 10 }} />
+                <Text style={[S.mono, { color: colors.faint, fontWeight: 'bold' }]}>Contact:</Text>
+                {passport?.patient?.contact?.phone && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={[S.mono, { color: colors.faint }]}>Phone:</Text>
+                    <Text style={S.mono}>{passport.patient.contact.phone}</Text>
+                  </View>
+                )}
+                {passport?.patient?.contact?.email && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={[S.mono, { color: colors.faint }]}>Email:</Text>
+                    <Text style={S.mono}>{passport.patient.contact.email}</Text>
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+
+        {/* Insurance Module */}
+        <View style={[S.card, { marginBottom: 20 }]}>
+          <Text style={[S.h2, { marginBottom: 15 }]}>Insurance Information</Text>
+          
+          <View style={{ gap: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={[S.mono, { color: colors.faint }]}>Member ID:</Text>
+              <Text style={S.mono}>{passport?.identifiers?.insuranceMemberId || 'Not provided'}</Text>
+            </View>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={[S.mono, { color: colors.faint }]}>Group Number:</Text>
+              <Text style={S.mono}>{passport?.identifiers?.insuranceGroupNumber || 'Not provided'}</Text>
+            </View>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={[S.mono, { color: colors.faint }]}>Plan Name:</Text>
+              <Text style={S.mono}>{passport?.identifiers?.insurancePlanName || 'Not provided'}</Text>
+            </View>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={[S.mono, { color: colors.faint }]}>Provider:</Text>
+              <Text style={S.mono}>{passport?.identifiers?.insuranceProvider || 'Not provided'}</Text>
+            </View>
+
+            {passport?.identifiers?.national && (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={[S.mono, { color: colors.faint }]}>National ID:</Text>
+                <Text style={S.mono}>{passport.identifiers.national}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Emergency Contacts Module */}
+        <View style={[S.card, { marginBottom: 30 }]}>
+          <Text style={[S.h2, { marginBottom: 15 }]}>Emergency Contacts</Text>
+          
+          {(!passport?.emergencyContacts || passport.emergencyContacts.length === 0) ? (
+            <Text style={[S.mono, { color: colors.faint, fontStyle: 'italic' }]}>
+              No emergency contacts on file
+            </Text>
+          ) : (
+            <View style={{ gap: 15 }}>
+              {passport.emergencyContacts.map((contact: any, index: number) => (
+                <View key={index} style={{ paddingBottom: 15, borderBottomWidth: index < passport.emergencyContacts.length - 1 ? 1 : 0, borderBottomColor: colors.faint }}>
+                  <Text style={[S.mono, { fontWeight: 'bold', marginBottom: 5 }]}>
+                    {contact.name || `Contact ${index + 1}`}
+                  </Text>
+                  {contact.relationship && (
+                    <Text style={[S.mono, { color: colors.faint }]}>
+                      Relationship: {contact.relationship}
+                    </Text>
+                  )}
+                  {contact.phone && (
+                    <Text style={S.mono}>Phone: {contact.phone}</Text>
+                  )}
+                  {contact.email && (
+                    <Text style={S.mono}>Email: {contact.email}</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
       </View>
 
       {/* QR Scanner Modal */}
@@ -278,6 +428,6 @@ export default function Home() {
           )}
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }

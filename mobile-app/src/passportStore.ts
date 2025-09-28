@@ -13,22 +13,22 @@ export function buildDemoPassport(runId: string) {
     source: 'patient-app',
 
     patient: {
-      mrn: null,
+      mrn: 'MRN789012345',
       firstName: 'Jordan',
       lastName: 'Lee',
       dob: '2005-03-14',
-      sex: 'Unknown',          // "M" | "F" | "X" | "Unknown"
-      ethnicity: null,
-      bloodType: null,
+      sex: 'Unknown',
+      ethnicity: 'Asian',
+      bloodType: 'O+',
       contact: { phone: null, email: null },
     },
 
     identifiers: { 
       national: null, 
-      insuranceMemberId: null,
-      insuranceGroupNumber: null,
-      insurancePlanName: null,
-      insuranceProvider: null
+      insuranceMemberId: 'ABC123456789',
+      insuranceGroupNumber: 'GRP001234',
+      insurancePlanName: 'BlueCross BlueShield Standard',
+      insuranceProvider: 'Anthem BCBS'
     },
 
     // core collections (start empty)
@@ -42,6 +42,22 @@ export function buildDemoPassport(runId: string) {
 
     // normalized notes
     notes: [{ author: 'demo', at: new Date().toISOString(), text: 'seeded v2' }],
+
+    // Emergency contacts
+    emergencyContacts: [
+      {
+        name: 'Sarah Lee',
+        relationship: 'Mother',
+        phone: '+1-555-0123',
+        email: 'sarah.lee@email.com'
+      },
+      {
+        name: 'Michael Chen',
+        relationship: 'Friend',
+        phone: '+1-555-0456',
+        email: null
+      }
+    ],
   };
 }
 
