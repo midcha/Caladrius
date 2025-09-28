@@ -74,10 +74,14 @@ class MedicalApiClient {
   /**
    * Confirm or cancel proceeding to final diagnosis
    */
-  async confirmDiagnosis(threadId: string, confirm: boolean): Promise<ApiResponse> {
+  async confirmDiagnosis(threadId: string, confirm: boolean, fullName?: string): Promise<ApiResponse> {
     return this.request<ApiResponse>('/confirm', {
       method: 'POST',
-      body: JSON.stringify({ thread_id: threadId, confirm }),
+      body: JSON.stringify({ 
+        thread_id: threadId, 
+        confirm,
+        full_name: fullName 
+      }),
     });
   }
 

@@ -153,7 +153,7 @@ def _coerce_differential_list(raw) -> list:
     items.sort(key=lambda x: x.get("rank", 0))
     return items
 
-def _push_patient_record(thread_id: str, state_values: dict, diagnosis_payload: dict):
+def _push_patient_record(thread_id: str, state_values: dict, diagnosis_payload: dict, patient_name: Optional[str] = None):
     client = _get_mongo_client()
     if not client:
         return  # silently skip if no DB configured
@@ -197,7 +197,8 @@ def _push_patient_record(thread_id: str, state_values: dict, diagnosis_payload: 
 
         # Build document per new schema
         doc = {
-            "name": thread_id,  # placeholder; replace with real patient name when available
+            "name": patient_name or thread_id,  # use provided patient name or fallback to thread_id
+            "thread_id": thread_id,
             "symptoms": symptoms_str,
             "differential_diagnosis": dd_list,  # required array; may be empty
             "clinical_summary": clinical_summary,
@@ -240,6 +241,7 @@ class ResumeRequest(BaseModel):
 class ConfirmRequest(BaseModel):
     thread_id: str
     confirm: bool
+    full_name: Optional[str] = None
 
 
 def serialize_result(result: dict):
@@ -318,7 +320,7 @@ def start_diagnosis(req: StartRequest):
             try:
                 diagnosis_payload = payload.get("diagnosis") if isinstance(payload.get("diagnosis"), dict) else {}
                 state = graph.get_state(config)
-                _push_patient_record(req.thread_id, state.values or {}, diagnosis_payload)
+                _push_patient_record(req.thread_id, state.values or {}, diagnosis_payload, None)
             except Exception:
                 pass
         return payload
@@ -368,7 +370,7 @@ def resume_diagnosis(req: ResumeRequest):
                 diagnosis_payload = payload.get("diagnosis") if isinstance(payload.get("diagnosis"), dict) else {}
                 # Get the latest state to capture final symptoms list
                 latest_state = graph.get_state(config)
-                _push_patient_record(req.thread_id, latest_state.values or {}, diagnosis_payload)
+                _push_patient_record(req.thread_id, latest_state.values or {}, diagnosis_payload, None)
             except Exception:
                 pass
         return payload
@@ -387,6 +389,7 @@ def confirm_diagnosis(req: ConfirmRequest):
 
     - **thread_id**: The session identifier
     - **confirm**: true to proceed, false to return to questioning
+    - **full_name**: Optional patient full name extracted from medical data
     """
     config = {"configurable": {"thread_id": req.thread_id}}
 
@@ -400,7 +403,7 @@ def confirm_diagnosis(req: ConfirmRequest):
             try:
                 diagnosis_payload = payload.get("diagnosis") if isinstance(payload.get("diagnosis"), dict) else {}
                 latest_state = graph.get_state(config)
-                _push_patient_record(req.thread_id, latest_state.values or {}, diagnosis_payload)
+                _push_patient_record(req.thread_id, latest_state.values or {}, diagnosis_payload, req.full_name)
             except Exception:
                 pass
 

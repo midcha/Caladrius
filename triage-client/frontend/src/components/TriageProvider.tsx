@@ -289,15 +289,20 @@ export default function TriageProvider({ children }: { children: React.ReactNode
     }
     setBusy(true);
     try {
-      // Send confirm but intentionally ignore the response to avoid UI branching here
-      await medicalApi.confirmDiagnosis(sessionId, confirm);
+      // Extract patient name from medical data
+      const passportSource = patientData.passportBundle?.json ?? patientData.passportData;
+      const extractedName = extractPatientName(passportSource);
+      const fullName = extractedName?.fullName;
+      
+      // Send confirm with extracted patient name
+      await medicalApi.confirmDiagnosis(sessionId, confirm, fullName);
     } catch (err) {
       // Intentionally ignore errors from confirm to avoid disrupting UI flow
       // You can log if needed: console.error(err);
     } finally {
       setBusy(false);
     }
-  }, [sessionId]);
+  }, [sessionId, patientData.passportBundle, patientData.passportData]);
 
   // Reset the entire triage process
   const reset = useCallback(() => {
