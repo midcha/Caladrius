@@ -108,7 +108,7 @@ def agent_node(state: State):
     coverage_guidance += "NEXT QUESTION PRIORITY: Ask about one of the missing areas above."
     
     # Determine if we should ask more questions or proceed to diagnosis
-    max_questions = 2  # Allow for more thorough information gathering
+    max_questions = 6  # Allow for more thorough information gathering
     should_continue_questioning = len(questions_asked) < max_questions
     
     messages = [
