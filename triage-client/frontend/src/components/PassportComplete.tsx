@@ -1,59 +1,76 @@
-"use client";
+import { imageDataToUrl } from "@/utils/helpers";
+import Image from "next/image";
 
-import ui from "./ui.module.css";
-import s from "./PassportUploader.module.css";
-
-interface Props {
-  data?: {
+interface PassportCompleteProps {
+  data: {
     json: unknown;
-    images: string[];
+    images: Record<string, string>;
   };
 }
 
-export default function PassportComplete({ data }: Props) {
+export default function PassportComplete({ data }: PassportCompleteProps) {
   return (
-    <div className={s.card} style={{ textAlign: "center" }}>
-      <p className={ui.kicker}>Step 2</p>
-      <h2 className={ui.title}>Upload Complete</h2>
-      <p className={ui.sub}>The patient passport has been uploaded.</p>
-
-      {data && (
-        <>
-          <h3 className={ui.title} style={{ marginTop: "1rem" }}>
-            Passport JSON
-          </h3>
-          <pre
-            style={{
-              textAlign: "left",
-              background: "#f5f5f5",
-              padding: "0.75rem",
-              borderRadius: "8px",
-              maxHeight: "200px",
-              overflow: "auto",
-            }}
-          >
-            {JSON.stringify(data.json, null, 2)}
-          </pre>
-
-          <h3 className={ui.title} style={{ marginTop: "1rem" }}>
-            Images
-          </h3>
-          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-            {data.images.map((img, i) => (
-              <img
-                key={i}
-                src={`data:image/jpeg;base64,${img}`}
-                alt={`Passport image ${i + 1}`}
-                style={{
-                  maxWidth: "150px",
-                  borderRadius: "8px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                }}
-              />
-            ))}
+    <div style={styles.container}>
+      <h2 style={styles.heading}>Data Uploaded</h2>
+      <pre style={styles.codeBlock}>{JSON.stringify(data.json, null, 2)}</pre>
+      <div style={styles.imageGrid}>
+        {Object.entries(data.images).map(([filename, base64]) => (
+          <div key={filename} style={styles.imageContainer}>
+            <Image
+              src={imageDataToUrl(base64)}
+              alt={filename}
+              width={600}
+              height={400}
+              style={{ width: "100%", height: "auto" }}
+            />
+            <p style={styles.filename}>{filename}</p>
           </div>
-        </>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
+
+const styles = {
+  container: {
+    padding: "16px",
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "16px",
+  },
+  heading: {
+    fontSize: "1.25rem",
+    fontWeight: "600",
+    margin: 0,
+  },
+  codeBlock: {
+    backgroundColor: "#f3f4f6",
+    padding: "8px",
+    borderRadius: "4px",
+    fontSize: "0.875rem",
+    overflow: "auto",
+    fontFamily: "monospace",
+  },
+  imageGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: "16px",
+  },
+  imageContainer: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+  },
+  image: {
+    maxWidth: "100%",
+    height: "auto",
+    borderRadius: "4px",
+    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+  },
+  filename: {
+    fontSize: "0.75rem",
+    marginTop: "4px",
+    margin: 0,
+    textAlign: "center" as const,
+  },
+} as const;

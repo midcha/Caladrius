@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTriage } from "./TriageProvider";
 import PassportStart from "./PassportStart";
 import PassportWaiting from "./PassportWaiting";
 import PassportComplete from "./PassportComplete";
 
 export default function PassportUploader() {
-  const { phase, submitPassport } = useTriage();
-  const sessionIdRef = useRef<string>(crypto.randomUUID());
+  const { phase, connectPhone, submitPassport } = useTriage();
+  const [sessionId, setSessionId] = useState(crypto.randomUUID());
   const [otp, setOtp] = useState<{
     sessionId: string;
     address: string;
@@ -18,16 +18,18 @@ export default function PassportUploader() {
 
   const [uploadedData, setUploadedData] = useState<{
     json: unknown;
-    images: string[];
+    images: Record<string, string>;
   }>();
 
   // Generate QR OTP
   useEffect(() => {
-    if (!sessionIdRef.current) return;
+    if (!sessionId) return;
 
     function fetchOtp() {
+      const newId = crypto.randomUUID();
+      setSessionId(newId);
       setOtp({
-        sessionId: sessionIdRef.current,
+        sessionId: newId,
         address: window.location.origin,
         time: Date.now(),
       });
@@ -50,26 +52,26 @@ export default function PassportUploader() {
   // Fetch uploaded bundle
   const readS3Bucket = async () => {
     const res = await fetch("/api/triage/read");
-    const data: { json: unknown; images: string[] } = await res.json();
+    const data: { json: unknown; images: Record<string, string> } =
+      await res.json();
     setUploadedData(data);
   };
 
   // SSE listener
   useEffect(() => {
     const evtSource = new EventSource(
-      `/api/triage/events?sessionId=${sessionIdRef.current}`
+      `/api/triage/events?sessionId=${sessionId}`
     );
 
     evtSource.onmessage = (event) => {
       console.log("SSE message:", event.data);
 
       if (event.data === "PHONE_CONNECTED") {
-        // move to waiting state
-        submitPassport({}); // optional: trigger backend? placeholder
+        connectPhone();
       }
       if (event.data === "BUNDLE_READY") {
         readS3Bucket().then(() => {
-          // no-op: state handled via context or uploadedData
+          submitPassport();
         });
       }
     };

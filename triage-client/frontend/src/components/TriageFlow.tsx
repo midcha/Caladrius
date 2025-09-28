@@ -14,13 +14,13 @@ export default function TriageFlow() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {phase === "vitals" && <VitalsForm />}
-      {phase === "passport" && <PassportUploader />}
+      {phase.startsWith("passport") && <PassportUploader />}
       {phase === "symptoms" && <SymptomsInput />}
       {phase === "processing" && (
         <div className={ui.panel}>
           <p className={ui.kicker}>Working</p>
           <p className={ui.sub}>
-            Backend processing… you'll be asked questions here if needed.
+            Backend processing… you&apos;ll be asked questions here if needed.
           </p>
         </div>
       )}

@@ -76,9 +76,10 @@ interface Ctx {
   busy: boolean;
   start: () => Promise<void>;
   submitVitals: (v: Vitals) => Promise<void>;
-  submitPassport: (dump: unknown) => Promise<void>;
+  submitPassport: () => Promise<void>;
   submitSymptoms: (text: string) => Promise<void>;
-  answerPrompt: (answer: string | boolean | null) => Promise<void>; // null => refused
+  answerPrompt: (answer: string | boolean | null) => Promise<void>;
+  connectPhone: () => void;
 }
 
 const TriageCtx = createContext<Ctx | null>(null);
@@ -122,22 +123,24 @@ export default function TriageProvider({
     // } finally {
     //   setBusy(false);
     // }
-    setPhase("passport");
+    setPhase("passport-start");
   }, []);
 
-  const submitPassport = useCallback(
-    async (dump: unknown) => {
-      if (!sessionId) throw new Error("Session not initialized");
-      setBusy(true);
-      try {
-        await postPassport(sessionId, dump);
-        setPhase("symptoms");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [sessionId]
-  );
+  const submitPassport = useCallback(async () => {
+    // if (!sessionId) throw new Error("Session not initialized");
+    // setBusy(true);
+    // try {
+    //   await postPassport(sessionId, dump);
+    //   setPhase("symptoms");
+    // } finally {
+    //   setBusy(false);
+    // }
+    setPhase("passport-complete");
+  }, [sessionId]);
+
+  const connectPhone = () => {
+    setPhase("passport-waiting");
+  };
 
   const submitSymptoms = useCallback(
     async (text: string) => {
@@ -211,6 +214,7 @@ export default function TriageProvider({
       submitPassport,
       submitSymptoms,
       answerPrompt,
+      connectPhone,
     }),
     [
       sessionId,
@@ -222,6 +226,7 @@ export default function TriageProvider({
       submitPassport,
       submitSymptoms,
       answerPrompt,
+      connectPhone,
     ]
   );
 
