@@ -4,7 +4,7 @@ import 'react-native-url-polyfill/auto';
 (global as any).Buffer = (global as any).Buffer || require('buffer').Buffer;
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Modal } from 'react-native';
 
 import * as FileSystem from 'expo-file-system/legacy';
 import { zip } from 'react-native-zip-archive';
@@ -229,41 +229,30 @@ export default function Home() {
     }
   }, [scanBusy, createZipAndReturnPath, uploadZipWithPath, setStep]);
 
-  // ===================== UI (restricted) =====================
+  // ===================== UI (clean user interface) =====================
   return (
-    <ScrollView style={S.screen} showsVerticalScrollIndicator>
-      <Text style={S.h1}>Home</Text>
-
-      {/* Single CTA */}
-      <View style={S.card}>
-        <Text style={S.h2}>Send Data</Text>
+    <View style={S.screen}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 }}>
+        <Text style={[S.h1, { textAlign: 'center', marginBottom: 40 }]}>Ready to Send Data</Text>
+        
         <TouchableOpacity 
-          style={S.btn(colors.accent)} 
+          style={[S.btn(colors.accent), { paddingVertical: 20, paddingHorizontal: 40, borderRadius: 12 }]}
           onPress={async () => {
             await ensureFilesExist();
             setScanOpen(true);
           }}
         >
-          <Text style={S.btnText}>Scan QR code to send data</Text>
+          <Text style={[S.btnText, { fontSize: 18 }]}>Scan QR Code</Text>
         </TouchableOpacity>
 
-        <Text style={[S.mono, { marginTop: 10, color: colors.faint }]}>Status: {status}</Text>
-        <Text style={[S.mono, { marginTop: 6, color: colors.faint }]}>
-          ZIP: {zipPath ?? '(none yet)'}
-        </Text>
-        <Text style={[S.mono, { marginTop: 6, color: colors.faint }]}>
-          Target: s3://{(process.env.BUCKET as string) || 'caladrius-buffer'}/runs/{sessionId || '—'}/
-        </Text>
+        {status !== 'Ready' && (
+          <Text style={[S.mono, { marginTop: 20, textAlign: 'center', color: colors.accent }]}>
+            {status}
+          </Text>
+        )}
       </View>
 
-      {/* (Optional) Minimal browse (read-only) */}
-      <View style={[S.card, { marginBottom: 30 }]}>
-        <Text style={S.h2}>Browse (read-only)</Text>
-        <Text style={[S.mono, { marginTop: 8 }]}>documentDirectory: {DOC_ROOT}</Text>
-        <Text style={[S.mono, { marginTop: 8 }]}>cacheDirectory: {CACHE_ROOT}</Text>
-      </View>
-
-      {/* QR Scanner Modal (safe onBarcodeScanned usage) */}
+      {/* QR Scanner Modal */}
       <Modal visible={scanOpen} animationType="slide" onRequestClose={() => setScanOpen(false)}>
         <View style={[S.screen, { justifyContent: 'center', alignItems: 'center' }]}>
           {hasCamPerm === false ? (
@@ -289,6 +278,6 @@ export default function Home() {
           )}
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }

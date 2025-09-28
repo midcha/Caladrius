@@ -23,7 +23,13 @@ export function buildDemoPassport(runId: string) {
       contact: { phone: null, email: null },
     },
 
-    identifiers: { national: null, insuranceMemberId: null },
+    identifiers: { 
+      national: null, 
+      insuranceMemberId: null,
+      insuranceGroupNumber: null,
+      insurancePlanName: null,
+      insuranceProvider: null
+    },
 
     // core collections (start empty)
     prescriptions: [],
