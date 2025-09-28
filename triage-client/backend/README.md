@@ -1,14 +1,15 @@
-# Medical Diagnosis API
+# Caladrius Triage Backend
 
-An AI-powered medical diagnosis system with interactive questioning built using LangGraph and FastAPI.
+An AI-powered medical triage system built with LangGraph and FastAPI, featuring interactive diagnostic questioning and MongoDB integration for patient data management.
 
 ## Features
 
 - **Interactive Diagnosis**: AI asks targeted medical questions to narrow down diagnoses
-- **JSON Output**: Structured differential diagnosis with probabilities and reasoning
-- **RESTful API**: Easy integration with web and mobile applications
-- **Session Management**: Persistent conversation threads
-- **Enhanced Questioning**: Focuses on obscure diagnostic questions to differentiate conditions
+- **LangGraph Integration**: State-based workflow with interrupts for user interaction
+- **MongoDB Integration**: Patient data persistence for triage admin dashboard
+- **Structured Output**: JSON-formatted differential diagnosis with triage priority levels
+- **CORS Support**: Ready for frontend integration
+- **Confirmation Flow**: Two-step process with diagnosis confirmation before completion
 
 ## Quick Start
 
@@ -23,9 +24,17 @@ pip install fastapi uvicorn pydantic langchain-openai langgraph python-dotenv
 Create a `.env` file:
 
 ```env
+# Required
 OPENAI_API_KEY=your_openai_api_key_here
+
+# Optional - AI Model Configuration
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_TEMPERATURE=0.3
+
+# Optional - MongoDB for patient data persistence
+TRIAGE_MONGO_URI=mongodb://localhost:27017/caladrius
+# Alternative naming (MONGO_URI also supported)
+MONGO_URI=mongodb://localhost:27017/caladrius
 ```
 
 ### 3. Start the Server
@@ -52,6 +61,16 @@ python test_api.py
 ### `GET /`
 Root endpoint with API information and available endpoints.
 
+**Response:**
+```json
+{
+  "message": "Medical Diagnosis API", 
+  "status": "running", 
+  "endpoints": ["/start", "/resume", "/confirm", "/health", "/docs"],
+  "description": "AI-powered medical diagnosis with interactive questioning"
+}
+```
+
 ### `POST /start`
 Start a new medical diagnosis session.
 
@@ -59,24 +78,22 @@ Start a new medical diagnosis session.
 ```json
 {
   "thread_id": "patient-001",
-  "symptoms": [
-    "chest pain",
-    "shortness of breath",
-    "fatigue"
-  ],
+  "symptoms": ["chest pain", "shortness of breath", "fatigue"],
   "medical_records": "45-year-old male, hypertension, family history of heart disease"
 }
 ```
 
-**Response:**
+**Response (Question):**
 ```json
 {
   "type": "question",
-  "query": "Can you describe when the chest pain started?",
+  "query": "When did this pain start?",
   "options": {
-    "Sudden": "Pain came on suddenly",
-    "Gradual": "Pain developed gradually over time"
+    "A few hours ago": "",
+    "Yesterday": "",
+    "Several days ago": ""
   },
+  "question_type": "multiple_choice",
   "status": "waiting_for_response"
 }
 ```
@@ -88,7 +105,30 @@ Continue a diagnosis session by answering a question.
 ```json
 {
   "thread_id": "patient-001",
-  "response": "The pain started suddenly about 2 hours ago"
+  "response": "A few hours ago",
+  "question": "When did this pain start?" // optional
+}
+```
+
+**Response (Confirmation Request):**
+```json
+{
+  "type": "confirm",
+  "action": "confirm_diagnosis_complete",
+  "message": "I have enough information to provide your diagnosis. Ready to proceed? (y/N)",
+  "status": "awaiting_confirmation"
+}
+```
+
+### `POST /confirm`
+Confirm proceeding to final diagnosis or provide patient name.
+
+**Request Body:**
+```json
+{
+  "thread_id": "patient-001",
+  "confirm": true,
+  "full_name": "John Doe" // optional - for database storage
 }
 ```
 
@@ -110,7 +150,7 @@ Continue a diagnosis session by answering a question.
     "clinical_summary": "High suspicion for acute coronary syndrome",
     "urgency_level": 1,
     "urgency_level_text": "Emergency",
-    "disclaimer": "This is for educational purposes only..."
+    "disclaimer": "This is for educational purposes only. Consult healthcare professionals."
   },
   "status": "completed"
 }
@@ -120,10 +160,10 @@ Continue a diagnosis session by answering a question.
 Get the current status of a diagnosis session.
 
 ### `GET /health`
-Health check endpoint.
+Health check endpoint - returns `{"status": "healthy"}`.
 
 ### `GET /example`
-Get example request formats for testing.
+Get example request formats for API testing.
 
 ## Usage Examples
 
@@ -132,8 +172,10 @@ Get example request formats for testing.
 ```python
 import requests
 
+BASE_URL = "http://localhost:8000"
+
 # Start diagnosis
-response = requests.post("http://localhost:8000/start", json={
+response = requests.post(f"{BASE_URL}/start", json={
     "thread_id": "patient-123",
     "symptoms": ["headache", "fever", "neck stiffness"],
     "medical_records": "22-year-old female, no medical history"
@@ -141,20 +183,46 @@ response = requests.post("http://localhost:8000/start", json={
 
 result = response.json()
 
-# Continue conversation
+# Interactive questioning loop
 while result.get("type") == "question":
-    print(f"Doctor: {result['query']}")
-    answer = input("Patient: ")
+    print(f"\nDoctor: {result['query']}")
     
-    response = requests.post("http://localhost:8000/resume", json={
+    if result.get("options"):
+        print("Options:")
+        for key, desc in result["options"].items():
+            print(f"  {key}: {desc}")
+    
+    answer = input("Your response: ")
+    
+    response = requests.post(f"{BASE_URL}/resume", json={
         "thread_id": "patient-123",
         "response": answer
     })
     result = response.json()
 
+# Handle confirmation step
+if result.get("type") == "confirm":
+    print(f"\n{result['message']}")
+    confirm_input = input("Proceed? (y/N): ")
+    confirm_bool = confirm_input.lower().startswith('y')
+    
+    response = requests.post(f"{BASE_URL}/confirm", json={
+        "thread_id": "patient-123",
+        "confirm": confirm_bool,
+        "full_name": "Jane Smith"  # optional
+    })
+    result = response.json()
+
 # Print final diagnosis
 if result.get("type") == "diagnosis":
-    print("Final Diagnosis:", result["diagnosis"])
+    diagnosis = result["diagnosis"]
+    print(f"\nFinal Diagnosis:")
+    print(f"Clinical Summary: {diagnosis.get('clinical_summary')}")
+    print(f"Urgency Level: {diagnosis.get('urgency_level')} - {diagnosis.get('urgency_level_text')}")
+    
+    for dd in diagnosis.get('differential_diagnosis', []):
+        print(f"\n{dd.get('rank')}. {dd.get('diagnosis')} ({dd.get('probability_percent')}%)")
+        print(f"   Reasoning: {dd.get('reasoning')}")
 ```
 
 ### JavaScript/Node.js Example
@@ -180,33 +248,83 @@ diagnose();
 ## File Structure
 
 ```
-HackGT2025/
-├── langgraph_model_medical.py  # Core diagnosis logic
-├── user_feedback_tool.py       # User interaction tools
-├── medical_api.py              # FastAPI server
-├── test_api.py                 # API test client
-├── start_server.py             # Server startup script
-├── README.md                   # This file
-└── .env                        # Environment variables
+triage-client/backend/
+├── medical_api.py                  # FastAPI server with CORS and MongoDB integration
+├── langgraph_model_medical.py      # LangGraph workflow with state management
+├── tools.py                        # Interactive tools (ask_user_for_input, signal_diagnosis_complete)
+├── start_server.py                 # Server startup script
+├── test_api.py                     # API test client
+├── README.md                       # This documentation
+├── .env                           # Environment variables
+└── __pycache__/                   # Python cache files
 ```
 
-## Customization
+## Core Components
 
-### Modify Symptoms and Medical Records
+### medical_api.py
+- FastAPI application with CORS middleware
+- MongoDB integration for patient data persistence
+- Request/response models and serialization
+- Urgency level mapping (1-5 scale)
+- Error handling and data validation
 
-Edit the `initial_state` in `medical_api.py` or send different data in API requests.
+### langgraph_model_medical.py  
+- LangGraph state-based workflow
+- AI agent with medical reasoning
+- State management for conversation flow
+- Integration with OpenAI GPT models
 
-### Adjust Question Limits
+### tools.py
+- `ask_user_for_input()` - Interactive questioning tool
+- `signal_diagnosis_complete()` - Confirmation flow tool
+- Support for multiple question types (multiple_choice, open_ended, select_multiple)
 
-Change `max_questions` in `langgraph_model_medical.py` to control how many questions are asked.
+## Configuration
 
-### Modify AI Behavior
+### MongoDB Integration
 
-Update the system prompts in `langgraph_model_medical.py` to change how the AI asks questions or generates diagnoses.
+The system automatically stores completed diagnoses in MongoDB if configured:
+- Database: `caladrius`
+- Collection: `patients`
+- Fields: patient name, symptoms, differential diagnosis, urgency level, timestamp
+
+If no MongoDB URI is provided, the system continues to work without database storage.
+
+### Question Flow Customization
+
+Modify the AI behavior in `langgraph_model_medical.py`:
+- **System Prompts**: Update medical reasoning instructions
+- **Question Limits**: Adjust maximum questions per session
+- **Urgency Mapping**: Customize triage priority levels (1-5 scale)
+
+### Frontend Integration
+
+The API includes CORS support for frontend integration:
+- All origins allowed (configure for production)
+- Supports the `/confirm` endpoint for two-step diagnosis flow
+- Compatible with React/Next.js frontends
+
+### Skip Token Support
+
+Frontend can send `"__skip__"` as a response to skip optional questions.
+
+## Triage Priority Levels
+
+The system uses a 5-level triage urgency scale:
+
+| Level | Text | Description |
+|-------|------|-------------|
+| 1 | Emergency | Life-threatening conditions requiring immediate attention |
+| 2 | Urgent | Serious conditions requiring prompt medical care |
+| 3 | Moderate | Standard medical conditions |
+| 4 | Minor | Non-urgent conditions |
+| 5 | Routine | Routine care or follow-up |
 
 ## Important Notes
 
-⚠️ **Disclaimer**: This system is for educational and research purposes only. It is not intended to replace professional medical advice, diagnosis, or treatment. Always consult qualified healthcare providers for medical concerns.
+⚠️ **Medical Disclaimer**: This system is for educational and research purposes only. It is not intended to replace professional medical advice, diagnosis, or treatment. Always consult qualified healthcare providers for medical concerns.
+
+**Database Privacy**: If using MongoDB, ensure proper security measures for patient data in production environments.
 
 ## Troubleshooting
 
