@@ -100,11 +100,19 @@ export default function Home() {
   const [passportEditor, setPassportEditor] = useState<string>('');
   const [indexViewer, setIndexViewer] = useState<string>('');
   const [resolvedAttachments, setResolvedAttachments] = useState<
-    Array<{ id: string; filename?: string; label?: string; size?: number | null; mime?: string; capturedAt?: string }>
-  >([]);
+  Array<{
+    id: string;
+    filename?: string;
+    description?: string | null;
+    ogFileName?: string | null;
+    size?: number | null;
+    mime?: string;
+    capturedAt?: string;
+  }>
+>([]);
 
   // ---- OPTIONAL CONTEXT INPUTS FOR IMPORTS ----
-  const [contextLabel, setContextLabel] = useState<string>('');
+  const [contextDescription, setContextDescription] = useState<string>(''); //required
   const [contextTags, setContextTags] = useState<string>('');
   const [contextSource, setContextSource] = useState<string>('patient-upload');
 
@@ -145,6 +153,11 @@ export default function Home() {
   }, [log]);
 
   const importFiles = useCallback(async () => {
+    if (!contextDescription.trim()) {
+      Alert.alert('Missing description', 'Please enter a brief description before importing.');
+      return;
+    }
+
     await ensureDir(ATT_DIR);
     const hasP = await FileSystem.getInfoAsync(PASSPORT);
     const hasI = await FileSystem.getInfoAsync(INDEX);
@@ -196,7 +209,8 @@ export default function Home() {
         size: info.size || null,
         capturedAt: new Date().toISOString(),
         context: {
-          label: contextLabel || a.name || `${id}.${ext}`,
+          ogFileName: a.name || `${id}.${ext}`,
+          description: contextDescription, // required text from the UI
           source: contextSource || 'patient-upload',
           tags: userTags,
         },
@@ -212,7 +226,7 @@ export default function Home() {
     await writeJson(INDEX, idx);
     await writeJson(PASSPORT, passport);
     await refreshTrees();
-  }, [runId, contextLabel, contextTags, contextSource, log, refreshTrees]);
+  }, [runId, contextDescription, contextTags, contextSource, log, refreshTrees]);
 
   const zipRun = useCallback(async () => {
     await ensureDir(ATT_DIR);
@@ -391,15 +405,16 @@ export default function Home() {
     const files: any[] = idx?.files ?? [];
     const filesById = new Map<string, any>(files.map((f) => [f.id, f]));
     const out = (passport.attachments ?? []).map((att: any) => {
-      const entry = filesById.get(att.id);
-      return {
-        id: att.id,
-        filename: entry?.filename,
-        label: entry?.context?.label,
-        size: entry?.size ?? null,
-        mime: entry?.mime ?? att?.mime,
-        capturedAt: entry?.capturedAt,
-      };
+    const entry = filesById.get(att.id);
+    return {
+      id: att.id,
+      filename: entry?.filename,
+      description: entry?.context?.description || entry?.context?.label || null, // fallback to legacy label
+      ogFileName: entry?.context?.ogFileName || null,
+      size: entry?.size ?? null,
+      mime: entry?.mime ?? att?.mime,
+      capturedAt: entry?.capturedAt,
+    };
     });
     setResolvedAttachments(out);
     log(`Resolved ${out.length} attachment references`);
@@ -548,7 +563,8 @@ export default function Home() {
             resolvedAttachments.map((r) => (
               <View key={r.id} style={{ marginBottom: 8 }}>
                 <Text style={S.mono}>• id: {r.id}</Text>
-                {r.label ? <Text style={S.mono}>  label: {r.label}</Text> : null}
+                {r.description ? <Text style={S.mono}>  description: {r.description}</Text> : null}
+                {r.ogFileName ? <Text style={S.mono}>  ogFileName: {r.ogFileName}</Text> : null}
                 {r.filename ? <Text style={S.mono}>  file: {r.filename}</Text> : null}
                 {r.mime ? <Text style={S.mono}>  mime: {r.mime}</Text> : null}
                 <Text style={S.mono}>  size: {r.size ?? '—'}</Text>
@@ -567,12 +583,13 @@ export default function Home() {
         <Text style={S.h2}>Optional Context</Text>
         <TextInput
           style={S.input}
-          value={contextLabel}
-          onChangeText={setContextLabel}
+          value={contextDescription}
+          onChangeText={setContextDescription}
           autoCapitalize="none"
-          placeholder="Label override (optional)"
+          placeholder="Brief description (required, e.g., 'Insurance card front')"
           placeholderTextColor={colors.faint}
         />
+
         <TextInput
           style={S.input}
           value={contextTags}
