@@ -1,0 +1,81 @@
+{
+  "version": 2,
+  "passportId": "PASSPORT-0001",
+  "issuedAt": "2025-09-27T10:00:00Z",
+  "source": "clinic-system",
+  "patient": {
+    "mrn": "MRN-12345",
+    "firstName": "Avery",
+    "lastName": "Morgan",
+    "dob": "1985-06-15",
+    "sex": "F",
+    "ethnicity": "Hispanic",
+    "bloodType": "O+",
+    "contact": {
+      "phone": "+1-555-0102",
+      "email": "avery.morgan@example.com"
+    }
+  },
+  "identifiers": {
+    "national": "NAT-888777",
+    "insuranceMemberId": "INS-555444"
+  },
+  "prescriptions": [
+    {
+      "id": "RX-1",
+      "medication": [
+        { "name": "Lisinopril", "dosageForm": "tablet", "strength": "10 mg" }
+      ],
+      "instructions": "Once daily",
+      "startDate": "2025-01-01"
+    }
+  ],
+  "imaging": [
+    {
+      "id": "IMG-1",
+      "type": "MRI",
+      "bodyRegion": "Brain",
+      "studyDate": "2025-08-01T14:30:00Z",
+      "performingFacility": "Central Imaging",
+      "report": {
+        "reportText": "Normal MRI of the brain.",
+        "impression": "No acute abnormalities.",
+        "createdAt": "2025-08-01T15:00:00Z"
+      },
+      "attachmentIds": ["att-1"]
+    }
+  ],
+  "labs": [
+    {
+      "id": "LAB-1",
+      "testName": "Basic Metabolic Panel",
+      "result": "Within normal limits",
+      "referenceRange": null,
+      "testDate": "2025-08-02T09:00:00Z",
+      "attachmentIds": ["att-2"]
+    }
+  ],
+  "encounters": [
+    {
+      "id": "ENC-1",
+      "type": "Outpatient",
+      "startDate": "2025-08-01T13:00:00Z",
+      "reason": "Headache",
+      "location": "Clinic A",
+      "labIds": ["LAB-1"],
+      "imagingIds": ["IMG-1"],
+      "prescriptionIds": ["RX-1"]
+    }
+  ],
+  "attachments": [
+    { "id": "att-1", "mime": "image/png", "role": "mri" },
+    { "id": "att-2", "mime": "image/png", "role": "lab-scan" }
+  ],
+  "notes": [
+    {
+      "author": "Dr. Patel",
+      "at": "2025-08-01T16:30:00Z",
+      "text": "Reassuring exam.. follow up PRN."
+    }
+  ]
+}
