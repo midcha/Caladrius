@@ -42,9 +42,20 @@ export default function PriorityQueue() {
   useEffect(() => {
     async function fetchPatients() {
       try {
-        const res = await fetch("http://localhost:5000/api/patients");
+        const res = await fetch("/api/patients", { cache: "no-store" });
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("/api/patients failed:", res.status, text);
+          setPatients([]);
+          return;
+        }
         const data = await res.json();
-        setPatients(data);
+        if (Array.isArray(data)) {
+          setPatients(data);
+        } else {
+          console.warn("/api/patients returned non-array:", data);
+          setPatients([]);
+        }
       } catch (err) {
         console.error("Error fetching patients:", err);
       }
@@ -73,7 +84,7 @@ export default function PriorityQueue() {
       // Send new order to backend
       try {
         const orderedIds = reordered.map((p) => p._id);
-        await fetch("http://localhost:5000/api/patients/reorder", {
+        await fetch("/api/patients/reorder", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ orderedIds }),

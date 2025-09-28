@@ -72,6 +72,87 @@ def _map_urgency_to_level(urgency_value) -> int:
             return 5
     return 3
 
+def _map_level_to_text(level: int) -> str:
+    mapping = {
+        1: "Emergency",
+        2: "High",
+        3: "Moderate",
+        4: "Low",
+        5: "Routine",
+    }
+    return mapping.get(int(level) if isinstance(level, (int, float, str)) and str(level).isdigit() else 3, "Moderate")
+
+def _parse_probability_to_percent(value) -> int:
+    """Coerce probability to integer percent (0-100). Accepts numbers or strings like '35%' or '0.35'."""
+    if value is None:
+        return 0
+    try:
+        if isinstance(value, (int, float)):
+            # Interpret <=1 as ratio, >1 as percent
+            return int(round(value * 100)) if 0 <= value <= 1 else int(round(value))
+        if isinstance(value, str):
+            s = value.strip().replace("%", "")
+            if "/" in s:  # e.g., '1/3'
+                num, den = s.split("/", 1)
+                num_f, den_f = float(num), float(den)
+                return int(round((num_f / den_f) * 100)) if den_f else 0
+            f = float(s)
+            return int(round(f * 100)) if 0 <= f <= 1 else int(round(f))
+    except Exception:
+        return 0
+    return 0
+
+def _coerce_differential_list(raw) -> list:
+    """Attempt to coerce a free-form list of differentials to the required schema.
+    Expected output items with keys: rank, diagnosis, probability_percent, reasoning, key_features, next_steps.
+    """
+    if not raw:
+        return []
+    items = []
+    # Accept either list of dicts or a dict with a key that contains a list
+    if isinstance(raw, dict):
+        # try common keys
+        for key in ["differential_diagnosis", "differentials", "diagnoses", "top_conditions", "items", "list"]:
+            if isinstance(raw.get(key), list):
+                raw = raw.get(key)
+                break
+    if not isinstance(raw, list):
+        return []
+    for idx, entry in enumerate(raw, start=1):
+        if not isinstance(entry, dict):
+            continue
+        diagnosis = entry.get("diagnosis") or entry.get("name") or entry.get("condition") or entry.get("label")
+        if not diagnosis:
+            # try to stringify
+            diagnosis = str(entry)
+        prob = entry.get("probability_percent") or entry.get("probability") or entry.get("prob") or entry.get("likelihood")
+        probability_percent = _parse_probability_to_percent(prob)
+        reasoning = entry.get("reasoning") or entry.get("rationale") or ""
+        key_features = entry.get("key_features") or entry.get("features") or []
+        next_steps = entry.get("next_steps") or entry.get("plan") or entry.get("actions") or []
+        # Coerce arrays
+        if isinstance(key_features, str):
+            key_features = [key_features]
+        if isinstance(next_steps, str):
+            next_steps = [next_steps]
+        # Rank: prefer explicit rank; else use loop index
+        rank = entry.get("rank")
+        try:
+            rank = int(rank) if rank is not None else idx
+        except Exception:
+            rank = idx
+        items.append({
+            "rank": rank,
+            "diagnosis": diagnosis,
+            "probability_percent": probability_percent,
+            "reasoning": reasoning,
+            "key_features": key_features if isinstance(key_features, list) else [],
+            "next_steps": next_steps if isinstance(next_steps, list) else [],
+        })
+    # Ensure sorted by rank ascending
+    items.sort(key=lambda x: x.get("rank", 0))
+    return items
+
 def _push_patient_record(thread_id: str, state_values: dict, diagnosis_payload: dict):
     client = _get_mongo_client()
     if not client:
@@ -86,16 +167,47 @@ def _push_patient_record(thread_id: str, state_values: dict, diagnosis_payload: 
         symptoms = state_values.get("symptoms", []) or []
         symptoms_str = ", ".join(symptoms) if isinstance(symptoms, list) else str(symptoms)
 
-        urgency_numeric = _map_urgency_to_level(
-            (diagnosis_payload or {}).get("urgency_level") or (diagnosis_payload or {}).get("urgency")
+        # Extract fields from diagnosis payload as available
+        diag = diagnosis_payload or {}
+        urgency_value = diag.get("urgency_level") or diag.get("urgency")
+        urgency_level = _map_urgency_to_level(urgency_value)
+        urgency_level_text = _map_level_to_text(urgency_level)
+
+        # Differential diagnosis list
+        dd_list = _coerce_differential_list(diag.get("differential_diagnosis") or diag.get("differentials") or diag.get("diagnoses") or diag)
+
+        # Clinical summary
+        clinical_summary = (
+            diag.get("clinical_summary") or
+            diag.get("summary") or
+            f"Symptoms: {symptoms_str}"
         )
 
+        # Optional age (if provided and numeric)
+        age_val = diag.get("age")
+        try:
+            age = int(age_val) if age_val is not None and str(age_val).strip() != "" else None
+        except Exception:
+            age = None
+
+        disclaimer = (
+            diag.get("disclaimer")
+            or "This AI output is for informational purposes only and is not a substitute for professional medical advice."
+        )
+
+        # Build document per new schema
         doc = {
-            "name": thread_id,  # using thread_id as a placeholder name
+            "name": thread_id,  # placeholder; replace with real patient name when available
             "symptoms": symptoms_str,
-            "level": int(urgency_numeric),
-            "priority": int(urgency_numeric),
+            "differential_diagnosis": dd_list,  # required array; may be empty
+            "clinical_summary": clinical_summary,
+            "urgency_level": int(urgency_level),
+            "urgency_level_text": urgency_level_text,
+            "disclaimer": disclaimer,
         }
+        if age is not None:
+            doc["age"] = age
+
         res = coll.insert_one(doc)
         print(f"[triage-client] Inserted patient doc into {db_name}.{coll_name} _id={res.inserted_id}")
     except Exception:
@@ -288,7 +400,7 @@ def confirm_diagnosis(req: ConfirmRequest):
             try:
                 diagnosis_payload = payload.get("diagnosis") if isinstance(payload.get("diagnosis"), dict) else {}
                 latest_state = graph.get_state(config)
-                # _push_patient_record(req.thread_id, latest_state.values or {}, diagnosis_payload)
+                _push_patient_record(req.thread_id, latest_state.values or {}, diagnosis_payload)
             except Exception:
                 pass
 
