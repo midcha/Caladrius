@@ -63,7 +63,7 @@ def agent_node(state: State):
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         temperature=0,
         reasoning={"effort": "low"},
-    ).bind_tools(tools)
+    ).bind_tools(tools, tool_choice="required")
     
     # Build the diagnostic context
     symptoms_str = ", ".join(symptoms) if symptoms else "No symptoms provided"
@@ -133,7 +133,8 @@ def agent_node(state: State):
             "• Be direct but caring\n"
             "• Ask at least 2 questions before diagnosis\n"
             "• Focus on missing areas from the list above\n\n"
-            "Actions:\n"
+            "Actions (MANDATORY):\n"
+            "• You MUST either ask a question or call a tool; never produce a final diagnosis directly from this node.\n"
             "• Need more info: use ask_user_for_input tool\n"
             "• Have enough info (2+ questions asked AND most areas covered): use signal_diagnosis_complete tool\n"
         )),
@@ -173,19 +174,39 @@ def agent_node(state: State):
                 return ask_user_for_input.invoke(params)
             
             elif tool_name == "signal_diagnosis_complete":
-                # Signal that we're ready for diagnosis with completion interrupt
-                return signal_diagnosis_complete.invoke({})
+                # Only honor completion if we've met our questioning threshold
+                if not should_continue_questioning:
+                    return signal_diagnosis_complete.invoke({})
+                # Otherwise, redirect to asking one more targeted question
+                follow_up = "Can you share a bit more detail?"
+                try:
+                    # Ask about one of the identified missing areas
+                    if missing_areas:
+                        area = missing_areas[0]
+                        prompts = {
+                            "quality": "How would you describe the pain/symptom?",
+                            "triggers": "What makes it better or worse?",
+                            "associated_symptoms": "Any other symptoms with this?",
+                            "context": "What were you doing when it started?",
+                            "history": "Have you had this before or take meds?",
+                        }
+                        follow_up = prompts.get(area, follow_up)
+                except Exception:
+                    pass
+                return ask_user_for_input.invoke({
+                    "query": follow_up,
+                    "question_type": "open_ended",
+                })
     
-    # No tool calls - check if we should complete or continue questioning
+    # No tool calls should not happen with tool_choice="required", but guard anyway
     if not should_continue_questioning:
-        # Force completion signal if we've reached our question limit or have sufficient info
+        # If we've reached our question limit, explicitly trigger the confirm tool
         return signal_diagnosis_complete.invoke({})
-    else:
-        # This shouldn't happen, but fallback to asking a generic question
-        return ask_user_for_input.invoke({
-            "query": "Is there anything else I should know?",
-            "question_type": "open_ended"
-        })
+    # Fallback: ask a generic open-ended question to avoid accidental finalization
+    return ask_user_for_input.invoke({
+        "query": "Is there anything else I should know?",
+        "question_type": "open_ended"
+    })
 
 
 def final_output_node(state: State):

@@ -139,14 +139,6 @@ export default function VitalsForm() {
           error={touched.spo2 ? errors.spo2 : undefined}
         />
       </div>
-
-      {!ok && (
-        <div className={s.actions}>
-          <span className={s.hint} aria-live="polite">
-            Please fill the empty fields to continue.
-          </span>
-        </div>
-      )}
     </form>
   );
 }

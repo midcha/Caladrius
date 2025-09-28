@@ -103,11 +103,13 @@ export default function TriageFlow() {
       
       {/* Processing */}
       {phase === "processing" && (
-        <LoadingAnimation 
-          message="Creating personalized questions based on your information..."
-          variant="heartbeat"
-          size="large"
-        />
+        <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <LoadingAnimation 
+            message="Creating personalized questions based on your information..."
+            variant="heartbeat"
+            size="large"
+          />
+        </div>
       )}
       
       {/* Diagnostic Questions */}
@@ -123,14 +125,25 @@ export default function TriageFlow() {
 
       {/* Confirm Proceed to Diagnosis */}
       {phase === "confirm" && (
-        <ConfirmPanel />
+        <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ConfirmPanel />
+        </div>
       )}
 
       {/* Completed message */}
       {phase === "completed" && (
-        <div className={ui.panel}>
-          <p className={ui.kicker}>All done!</p>
-          <p className={ui.sub}>We’re generating your diagnosis now.</p>
+        <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className={ui.panel}>
+            <p className={ui.kicker}>All done!</p>
+            <p className={ui.sub}>We’re generating your diagnosis now.</p>
+            <button 
+              className={`${ui.btn} ${ui.primary}`}
+              onClick={reset}
+              style={{ marginTop: '16px' }}
+            >
+              Start New Assessment
+            </button>
+          </div>
         </div>
       )}
       

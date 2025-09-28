@@ -46,7 +46,7 @@ export default function StepTransition({
           <LoadingAnimation 
             message={loadingMessage}
             variant={variant}
-            size="medium"
+            size="large"
           />
         </div>
       )}

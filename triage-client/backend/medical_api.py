@@ -288,7 +288,7 @@ def confirm_diagnosis(req: ConfirmRequest):
             try:
                 diagnosis_payload = payload.get("diagnosis") if isinstance(payload.get("diagnosis"), dict) else {}
                 latest_state = graph.get_state(config)
-                _push_patient_record(req.thread_id, latest_state.values or {}, diagnosis_payload)
+                # _push_patient_record(req.thread_id, latest_state.values or {}, diagnosis_payload)
             except Exception:
                 pass
 

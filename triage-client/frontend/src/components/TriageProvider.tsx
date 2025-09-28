@@ -220,32 +220,18 @@ export default function TriageProvider({ children }: { children: React.ReactNode
   // Confirm or cancel proceed-to-diagnosis
   const confirmProceed = useCallback(async (confirm: boolean) => {
     if (!sessionId) return;
-    // Immediately show a completed message if confirming
+    // Optimistic UI: immediately mark completed on confirm, and clear confirm message
     if (confirm) {
+      setConfirmMessage(undefined);
       setPhase("completed");
     }
     setBusy(true);
     try {
-      const response = await medicalApi.confirmDiagnosis(sessionId, confirm);
-      if (response.type === 'question') {
-        setCurrentQuestion(response);
-        setConfirmMessage(undefined);
-        setPhase("prompt");
-      } else if (response.type === 'confirm') {
-        // Still awaiting confirmation (edge case)
-        setConfirmMessage(response.message);
-        if (!confirm) setPhase("confirm");
-      } else if (response.type === 'diagnosis') {
-        setDiagnosis(response);
-        setConfirmMessage(undefined);
-        setPhase("diagnosis");
-      } else if (response.type === 'error') {
-        setError(response.error);
-        setPhase("error");
-      }
+      // Send confirm but intentionally ignore the response to avoid UI branching here
+      await medicalApi.confirmDiagnosis(sessionId, confirm);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to confirm');
-      setPhase("error");
+      // Intentionally ignore errors from confirm to avoid disrupting UI flow
+      // You can log if needed: console.error(err);
     } finally {
       setBusy(false);
     }
