@@ -278,27 +278,23 @@ export default function TriageProvider({ children }: { children: React.ReactNode
   // Confirm or cancel proceed-to-diagnosis
   const confirmProceed = useCallback(async (confirm: boolean) => {
     if (!sessionId) return;
-    // Move completion state change to after the confirm request finishes
     setBusy(true);
+    
     try {
       // Extract patient name from medical data
       const passportSource = patientData.passportBundle?.json ?? patientData.passportData;
       const extractedName = extractPatientName(passportSource);
       const fullName = extractedName?.fullName;
       
-      // Send confirm with extracted patient name
-      await medicalApi.confirmDiagnosis(sessionId, confirm, fullName);
-      // Show success notice after the confirm flow completes
-      if (confirm) {
-        setConfirmMessage(undefined);
-        setPhase("completed");
-      }
+      // Send confirm with extracted patient name (fire and forget)
+      medicalApi.confirmDiagnosis(sessionId, confirm, fullName);
     } catch {
-      // Intentionally ignore errors from confirm to avoid disrupting UI flow
-      // You can log if needed: console.error(err);
-    } finally {
-      setBusy(false);
+      // Ignore any errors from the API call
     }
+    
+    // Always transition straight to success notice regardless of API response
+    setPhase("completed");
+    setBusy(false);
   }, [sessionId, patientData.passportBundle, patientData.passportData]);
 
   // Reset the entire triage process

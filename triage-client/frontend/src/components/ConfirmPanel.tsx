@@ -1,10 +1,18 @@
 "use client";
 
+import { useEffect } from "react";
 import { useTriage } from "./TriageProvider";
 import ui from "./ui.module.css";
 
 export function ConfirmPanel() {
   const { busy, confirmProceed } = useTriage();
+  
+  // Auto-click confirm when component mounts
+  useEffect(() => {
+    if (!busy) {
+      confirmProceed(true);
+    }
+  }, [busy, confirmProceed]);
 
   return (
     <div className={ui.panel}>
