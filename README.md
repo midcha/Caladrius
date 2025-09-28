@@ -8,7 +8,7 @@ Caladrius is a comprehensive AI-powered medical triage system that streamlines e
 
 **Watch Caladrius in Action**
 
-[![Caladrius Demo Video](https://img.youtube.com/vi/VIDEO_ID_HERE/maxresdefault.jpg)](https://youtu.be/1fI_w06EoZQ?si=qV1rvBV5mpBK8hJR)
+[![Caladrius Demo Video](https://img.youtube.com/vi/1fI_w06EoZQ?si=qV1rvBV5mpBK8hJR/maxresdefault.jpg)](https://youtu.be/1fI_w06EoZQ?si=qV1rvBV5mpBK8hJR)
 
 *Click the image above to watch our full system demonstration, showcasing the mobile app, triage client, and admin dashboard working together.*
 
