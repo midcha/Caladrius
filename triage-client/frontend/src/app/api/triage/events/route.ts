@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
       // Send initial handshake
       sendMessage("connected");
 
-      // Heartbeat ping
+      // Debugging
       const interval = setInterval(() => sendMessage("ping"), 15000);
 
       // Track this client
