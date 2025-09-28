@@ -11,6 +11,7 @@ import ui from "./ui.module.css";
 import { ConfirmPanel } from "./ConfirmPanel";
 import ConfirmName from "./ConfirmName";
 import PassportComplete from "./PassportComplete";
+import SuccessNotice from "./SuccessNotice";
 
 export default function TriageFlow() {
   const { 
@@ -183,17 +184,7 @@ export default function TriageFlow() {
       {/* Completed message */}
       {phase === "completed" && (
         <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className={ui.panel}>
-            <p className={ui.kicker}>All done!</p>
-            <p className={ui.sub}>We’re generating your diagnosis now.</p>
-            <button 
-              className={`${ui.btn} ${ui.primary}`}
-              onClick={reset}
-              style={{ marginTop: '16px' }}
-            >
-              Start New Assessment
-            </button>
-          </div>
+          <SuccessNotice />
         </div>
       )}
       

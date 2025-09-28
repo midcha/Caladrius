@@ -7,3 +7,41 @@
   box-shadow: var(--panel-shadow);
   padding: 24px;
 }
+
+.container{
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.content{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  max-width: 720px;
+}
+
+.logoWrap{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.logo{
+  width: 128px;
+  height: 128px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 20px rgba(0,0,0,0.12));
+}
+
+.bigTitle{
+  font-size: 32px;
+}
+
+.subLarge{
+  font-size: 18px;
+}

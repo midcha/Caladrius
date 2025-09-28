@@ -97,9 +97,21 @@ export default function PassportUploader() {
     return () => evtSource.close();
   }, [sessionId, passportStage, connectPhone, fetchBundle]);
 
+  const refreshQR = useCallback(() => {
+    const newSessionId = crypto.randomUUID();
+    setSessionId(newSessionId);
+    setOtp({
+      sessionId: newSessionId,
+      address: window.location.origin,
+      time: Date.now(),
+    });
+    setTimeLeft(OTP_DURATION_SECONDS);
+    hasRequestedBundle.current = false;
+  }, []);
+
   const renderContent = useMemo(() => {
     if (passportStage === "start") {
-      return <PassportStart otp={otp} timeLeft={timeLeft} />;
+      return <PassportStart otp={otp} timeLeft={timeLeft} onRefresh={refreshQR} />;
     }
 
     if (passportStage === "waiting") {

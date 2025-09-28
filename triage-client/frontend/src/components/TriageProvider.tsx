@@ -278,11 +278,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
   // Confirm or cancel proceed-to-diagnosis
   const confirmProceed = useCallback(async (confirm: boolean) => {
     if (!sessionId) return;
-    // Optimistic UI: immediately mark completed on confirm, and clear confirm message
-    if (confirm) {
-      setConfirmMessage(undefined);
-      setPhase("completed");
-    }
+    // Move completion state change to after the confirm request finishes
     setBusy(true);
     try {
       // Extract patient name from medical data
@@ -292,6 +288,11 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       
       // Send confirm with extracted patient name
       await medicalApi.confirmDiagnosis(sessionId, confirm, fullName);
+      // Show success notice after the confirm flow completes
+      if (confirm) {
+        setConfirmMessage(undefined);
+        setPhase("completed");
+      }
     } catch {
       // Intentionally ignore errors from confirm to avoid disrupting UI flow
       // You can log if needed: console.error(err);
