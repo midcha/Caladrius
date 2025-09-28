@@ -69,6 +69,21 @@ export default function TabLayout() {
         }}
       />
 
+      {/* Patient Info view */}
+      <Tabs.Screen
+        name="passportView"
+        options={{
+          tabBarLabel: 'My Info',
+          tabBarIcon: ({ color }) => (
+            <Image
+              source={require('@/assets/images/pencil.png')}
+              style={{ width: 26, height: 26, tintColor: color }}
+              contentFit="contain"
+            />
+          ),
+        }}
+      />
+
       {/* Admin view */}
       <Tabs.Screen
         name="index"

@@ -15,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 /* Styles & FS helpers (ground truth) */
 import { colors, S } from '../../src/styles';
 import {
-  DOC_ROOT, CACHE_ROOT, ensureDir, bytes, copyDirRecursive, writeJson, readJson
+  DOC_ROOT, CACHE_ROOT, ensureDir, bytes, copyDirRecursive, writeJson
 } from '../../src/fs';
 import { PASSPORT, ATT_DIR, INDEX, buildDemoPassport, buildEmptyIndex } from '../../src/passportStore';
 
@@ -79,7 +79,6 @@ export default function Home() {
   const [sessionId, setSessionId] = useState<string>(''); // from QR
   const [address, setAddress] = useState<string>('');      // from QR
   const [zipPath, setZipPath] = useState<string | null>(null);
-  const [passport, setPassport] = useState<any>(null);
 
   const [status, setStatus] = useState<string>('Ready');
   const setStep = (s: string) => {
@@ -94,32 +93,16 @@ export default function Home() {
   const hasCamPerm = perm?.granted ?? null;
   useEffect(() => { if (!perm) requestPermission(); }, [perm, requestPermission]);
 
-  // Load passport data for display
-  const loadPassportData = useCallback(async () => {
-    try {
-      const data = await readJson<any>(PASSPORT);
-      setPassport(data);
-    } catch {
-      setPassport(null);
-    }
-  }, []);
-
-  // Load passport on mount
-  useEffect(() => {
-    loadPassportData();
-  }, [loadPassportData]);
-
   // ---- Ensure files exist (exactly like admin initStage) ----
   const ensureFilesExist = useCallback(async () => {
-    setStep('INIT (ensuring files exist)');
+    setStep(`INIT (ensuring files exist)`);
     await ensureDir(ATT_DIR);
     const pInfo = await FileSystem.getInfoAsync(PASSPORT);
     const iInfo = await FileSystem.getInfoAsync(INDEX);
     if (!pInfo.exists) await writeJson(PASSPORT, buildDemoPassport(runId));
     if (!iInfo.exists) await writeJson(INDEX, buildEmptyIndex(runId));
     setStep('Seeded passport.json + attachments/index.json');
-    await loadPassportData(); // Refresh passport display
-  }, [runId, setStep, loadPassportData]);
+  }, [runId, setStep]);
 
   // ---- Create ZIP and return path directly ----
   const createZipAndReturnPath = useCallback(async (): Promise<string> => {
@@ -209,7 +192,7 @@ export default function Home() {
     }
   }, [setStep]);
 
-  // ---- QR scan handler (EXACT original working version) ----
+  // ---- QR scan handler (fixed version) ----
   const onScan = useCallback(async ({ data }: { data: string }) => {
     if (scanBusy) return;
     setScanBusy(true);
@@ -246,195 +229,41 @@ export default function Home() {
     }
   }, [scanBusy, createZipAndReturnPath, uploadZipWithPath, setStep]);
 
-  // Helper to format dates
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return 'Not provided';
-    try {
-      return new Date(dateStr).toLocaleDateString();
-    } catch {
-      return dateStr;
-    }
-  };
-
-  // ===================== UI (patient info layout) =====================
+  // ===================== UI (restricted) =====================
   return (
-    <ScrollView
-      style={S.screen}
-      contentContainerStyle={{ paddingBottom: 24 }}
-      showsVerticalScrollIndicator={true}
-    >
-      <View style={{ paddingHorizontal: 20, paddingVertical: 20 }}>
-        
-        {/* Header with patient name */}
-        <View style={{ marginBottom: 30, alignItems: 'center' }}>
-          <Text style={[S.h1, { textAlign: 'center', marginBottom: 20 }]}>
-            Hello, {passport?.patient?.firstName || 'Patient'} {passport?.patient?.lastName || ''}
-          </Text>
-          
-          <TouchableOpacity 
-            style={[S.btn(colors.accent), { paddingVertical: 20, paddingHorizontal: 40, borderRadius: 12 }]}
-            onPress={async () => {
-              await ensureFilesExist();
-              setScanOpen(true);
-            }}
-          >
-            <Text style={[S.btnText, { fontSize: 18 }]}>Scan to Upload</Text>
-          </TouchableOpacity>
+    <ScrollView style={S.screen} showsVerticalScrollIndicator>
+      <Text style={S.h1}>Home</Text>
 
-          {status !== 'Ready' && (
-            <Text style={[S.mono, { marginTop: 12, textAlign: 'center', color: colors.accent }]}>
-              {status}
-            </Text>
-          )}
-        </View>
+      {/* Single CTA */}
+      <View style={S.card}>
+        <Text style={S.h2}>Send Data</Text>
+        <TouchableOpacity 
+          style={S.btn(colors.accent)} 
+          onPress={async () => {
+            await ensureFilesExist();
+            setScanOpen(true);
+          }}
+        >
+          <Text style={S.btnText}>Scan QR code to send data</Text>
+        </TouchableOpacity>
 
-        {/* Basic Information Module */}
-        <View style={[S.card, S.sectionSpacing]}>
-          <Text style={[S.h2, { marginBottom: 12 }]}>Basic Information</Text>
-          
-          <View style={{ gap: 12 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={S.faint}>Date of Birth:</Text>
-              <Text style={S.mono}>{formatDate(passport?.patient?.dob)}</Text>
-            </View>
-
-            <View style={{ height: 1, backgroundColor: colors.line }} />
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={S.faint}>Sex:</Text>
-              <Text style={S.mono}>{passport?.patient?.sex || 'Not provided'}</Text>
-            </View>
-
-            <View style={{ height: 1, backgroundColor: colors.line }} />
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={S.faint}>Blood Type:</Text>
-              <Text style={S.mono}>{passport?.patient?.bloodType || 'Not provided'}</Text>
-            </View>
-
-            <View style={{ height: 1, backgroundColor: colors.line }} />
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={S.faint}>Ethnicity:</Text>
-              <Text style={S.mono}>{passport?.patient?.ethnicity || 'Not provided'}</Text>
-            </View>
-
-            <View style={{ height: 1, backgroundColor: colors.line }} />
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={S.faint}>MRN:</Text>
-              <Text style={S.mono}>{passport?.patient?.mrn || 'Not provided'}</Text>
-            </View>
-
-            {(passport?.patient?.contact?.phone || passport?.patient?.contact?.email) && (
-              <>
-                <View style={{ height: 8 }} />
-                <Text style={[S.faint, { fontFamily: 'SpaceGrotesk_600SemiBold' }]}>Contact</Text>
-                {passport?.patient?.contact?.phone && (
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={S.faint}>Phone:</Text>
-                    <Text style={S.mono}>{passport.patient.contact.phone}</Text>
-                  </View>
-                )}
-                {passport?.patient?.contact?.email && (
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={S.faint}>Email:</Text>
-                    <Text style={S.mono}>{passport.patient.contact.email}</Text>
-                  </View>
-                )}
-              </>
-            )}
-          </View>
-        </View>
-
-        {/* Insurance Module */}
-        <View style={[S.card, S.sectionSpacing]}>
-          <Text style={[S.h2, { marginBottom: 12 }]}>Insurance Information</Text>
-          
-          <View style={{ gap: 12 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={S.faint}>Member ID:</Text>
-              <Text style={S.mono}>{passport?.identifiers?.insuranceMemberId || 'Not provided'}</Text>
-            </View>
-
-            <View style={{ height: 1, backgroundColor: colors.line }} />
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={S.faint}>Group Number:</Text>
-              <Text style={S.mono}>{passport?.identifiers?.insuranceGroupNumber || 'Not provided'}</Text>
-            </View>
-
-            <View style={{ height: 1, backgroundColor: colors.line }} />
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={S.faint}>Plan Name:</Text>
-              <Text style={S.mono}>{passport?.identifiers?.insurancePlanName || 'Not provided'}</Text>
-            </View>
-
-            <View style={{ height: 1, backgroundColor: colors.line }} />
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={S.faint}>Provider:</Text>
-              <Text style={S.mono}>{passport?.identifiers?.insuranceProvider || 'Not provided'}</Text>
-            </View>
-
-            {passport?.identifiers?.national && (
-              <>
-                <View style={{ height: 1, backgroundColor: colors.line }} />
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={S.faint}>National ID:</Text>
-                  <Text style={S.mono}>{passport.identifiers.national}</Text>
-                </View>
-              </>
-            )}
-          </View>
-        </View>
-
-        {/* Emergency Contacts Module */}
-        <View style={[S.card, { marginBottom: 24 }]}>
-          <Text style={[S.h2, { marginBottom: 12 }]}>Emergency Contacts</Text>
-          
-          {(!passport?.emergencyContacts || passport.emergencyContacts.length === 0) ? (
-            <Text style={[S.faint, { fontStyle: 'italic' }]}>
-              No emergency contacts on file
-            </Text>
-          ) : (
-            <View style={{ gap: 16 }}>
-              {passport.emergencyContacts.map((contact: any, index: number) => (
-                <View
-                  key={index}
-                  style={{
-                    paddingBottom: 12,
-                    borderBottomWidth: index < passport.emergencyContacts.length - 1 ? 1 : 0,
-                    borderBottomColor: colors.line,
-                  }}
-                >
-                  <Text style={[S.body, { fontFamily: 'SpaceGrotesk_600SemiBold', marginBottom: 4 }]}>
-                    {contact.name || `Contact ${index + 1}`}
-                  </Text>
-                  {contact.relationship && (
-                    <Text style={S.faint}>
-                      Relationship: <Text style={S.body}>{contact.relationship}</Text>
-                    </Text>
-                  )}
-                  {contact.phone && (
-                    <Text style={S.body}>
-                      Phone: <Text style={S.mono}>{contact.phone}</Text>
-                    </Text>
-                  )}
-                  {contact.email && (
-                    <Text style={S.body}>
-                      Email: <Text style={S.mono}>{contact.email}</Text>
-                    </Text>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
+        {/* <Text style={[S.mono, { marginTop: 10, color: colors.faint }]}>Status: {status}</Text>
+        <Text style={[S.mono, { marginTop: 6, color: colors.faint }]}>
+          ZIP: {zipPath ?? '(none yet)'}
+        </Text>
+        <Text style={[S.mono, { marginTop: 6, color: colors.faint }]}>
+          Target: s3://{(process.env.BUCKET as string) || 'caladrius-buffer'}/runs/{sessionId || '—'}/
+        </Text> */}
       </View>
 
-      {/* QR Scanner Modal */}
+      {/* (Optional) Minimal browse (read-only)
+      <View style={[S.card, { marginBottom: 30 }]}>
+        <Text style={S.h2}>Browse (read-only)</Text>
+        <Text style={[S.mono, { marginTop: 8 }]}>documentDirectory: {DOC_ROOT}</Text>
+        <Text style={[S.mono, { marginTop: 8 }]}>cacheDirectory: {CACHE_ROOT}</Text>
+      </View> */}
+
+      {/* QR Scanner Modal (safe onBarcodeScanned usage) */}
       <Modal visible={scanOpen} animationType="slide" onRequestClose={() => setScanOpen(false)}>
         <View style={[S.screen, { justifyContent: 'center', alignItems: 'center' }]}>
           {hasCamPerm === false ? (
