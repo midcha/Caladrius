@@ -2,49 +2,44 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTriage } from "./TriageProvider";
-import ui from "./ui.module.css";
-import s from "./PassportUploader.module.css";
-import Spinner from "./Spinner";
-import QRCode from "react-qr-code";
+import PassportStart from "./PassportStart";
+import PassportWaiting from "./PassportWaiting";
+import PassportComplete from "./PassportComplete";
 
 export default function PassportUploader() {
-  const { submitPassport, busy } = useTriage();
-  const [text, setText] = useState(
-    '{\n  "allergies": ["penicillin"],\n  "medications": [],\n  "conditions": []\n}'
-  );
-
-  const sessionIdRef = useRef<string>(crypto.randomUUID()); //Hardcoded till i ask about context
-  const [timeLeft, setTimeLeft] = useState<number>(60);
+  const { phase, submitPassport } = useTriage();
+  const sessionIdRef = useRef<string>(crypto.randomUUID());
   const [otp, setOtp] = useState<{
     sessionId: string;
     address: string;
     time: number;
   }>();
+  const [timeLeft, setTimeLeft] = useState<number>(60);
 
+  const [uploadedData, setUploadedData] = useState<{
+    json: unknown;
+    images: string[];
+  }>();
+
+  // Generate QR OTP
   useEffect(() => {
     if (!sessionIdRef.current) return;
 
-    async function fetchOtp() {
-      try {
-        // Need to get otp secret from backend, for now lets just hardcode
-        // const res = await fetch(`/triage/${sessionId}`);
-        // const data = await res.json();
-        setOtp({
-          sessionId: sessionIdRef.current,
-          address: window.location.origin,
-          time: Date.now(),
-        });
-        setTimeLeft(60);
-      } catch (err) {
-        console.error("Failed to fetch OTP:", err);
-      }
+    function fetchOtp() {
+      setOtp({
+        sessionId: sessionIdRef.current,
+        address: window.location.origin,
+        time: Date.now(),
+      });
+      setTimeLeft(60);
     }
 
     fetchOtp();
     const interval = setInterval(fetchOtp, 60000);
     return () => clearInterval(interval);
-  }, [sessionIdRef]);
+  }, []);
 
+  // Countdown timer
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
@@ -52,12 +47,14 @@ export default function PassportUploader() {
     return () => clearInterval(timer);
   }, []);
 
+  // Fetch uploaded bundle
   const readS3Bucket = async () => {
     const res = await fetch("/api/triage/read");
-    const data = await res.json();
+    const data: { json: unknown; images: string[] } = await res.json();
+    setUploadedData(data);
   };
-  //Listen for complete signal
 
+  // SSE listener
   useEffect(() => {
     const evtSource = new EventSource(
       `/api/triage/events?sessionId=${sessionIdRef.current}`
@@ -66,9 +63,14 @@ export default function PassportUploader() {
     evtSource.onmessage = (event) => {
       console.log("SSE message:", event.data);
 
+      if (event.data === "PHONE_CONNECTED") {
+        // move to waiting state
+        submitPassport({}); // optional: trigger backend? placeholder
+      }
       if (event.data === "BUNDLE_READY") {
-        console.log("Bundle ready received, fetching S3...");
-        readS3Bucket();
+        readS3Bucket().then(() => {
+          // no-op: state handled via context or uploadedData
+        });
       }
     };
 
@@ -77,30 +79,21 @@ export default function PassportUploader() {
       evtSource.close();
     };
 
-    return () => {
-      evtSource.close();
-    };
-  }, []);
+    return () => evtSource.close();
+  }, [submitPassport]);
 
-  return (
-    <div className={s.card} style={{ textAlign: "center" }}>
-      <p className={ui.kicker}>Step 2</p>
-      <h2 className={ui.title}>Scan QR with phone</h2>
-      <p className={ui.sub}>
-        Scan this QR in the phone app to start the secure upload. It refreshes
-        every minute.
-      </p>
+  // Render based on phase
+  if (phase === "passport-start") {
+    return <PassportStart otp={otp} timeLeft={timeLeft} />;
+  }
 
-      {otp ? (
-        <>
-          <QRCode value={JSON.stringify(otp)} size={200} />
-          <div style={{ marginTop: "0.5rem", fontSize: "0.9rem" }}>
-            QR expires in: {timeLeft}s
-          </div>
-        </>
-      ) : (
-        <p>Generating QR...</p>
-      )}
-    </div>
-  );
+  if (phase === "passport-waiting") {
+    return <PassportWaiting />;
+  }
+
+  if (phase === "passport-complete") {
+    return <PassportComplete data={uploadedData} />;
+  }
+
+  return null;
 }

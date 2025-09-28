@@ -15,7 +15,9 @@ export type BackendQuestion = {
 
 export type TriagePhase =
   | "vitals"
-  | "passport"
+  | "passport-start"
+  | "passport-waiting"
+  | "passport-complete"
   | "symptoms"
   | "processing"
   | "prompt"
