@@ -14,7 +14,7 @@ export default function PassportUploader() {
   );
 
   const sessionIdRef = useRef<string>(crypto.randomUUID()); //Hardcoded till i ask about context
-  const [timeLeft, setTimeLeft] = useState<number>(30);
+  const [timeLeft, setTimeLeft] = useState<number>(60);
   const [otp, setOtp] = useState<{
     sessionId: string;
     address: string;
@@ -34,14 +34,14 @@ export default function PassportUploader() {
           address: window.location.origin,
           time: Date.now(),
         });
-        setTimeLeft(30);
+        setTimeLeft(60);
       } catch (err) {
         console.error("Failed to fetch OTP:", err);
       }
     }
 
     fetchOtp();
-    const interval = setInterval(fetchOtp, 30000);
+    const interval = setInterval(fetchOtp, 60000);
     return () => clearInterval(interval);
   }, [sessionIdRef]);
 
@@ -82,23 +82,13 @@ export default function PassportUploader() {
     };
   }, []);
 
-  // const handle = async (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   try {
-  //     const json = JSON.parse(text);
-  //     await submitPassport(json);
-  //   } catch {
-  //     alert("Invalid JSON");
-  //   }
-  // };
-
   return (
     <div className={s.card} style={{ textAlign: "center" }}>
       <p className={ui.kicker}>Step 2</p>
       <h2 className={ui.title}>Scan QR with phone</h2>
       <p className={ui.sub}>
         Scan this QR in the phone app to start the secure upload. It refreshes
-        every 30 seconds.
+        every minute.
       </p>
 
       {otp ? (
