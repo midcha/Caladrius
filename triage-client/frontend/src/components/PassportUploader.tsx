@@ -23,6 +23,8 @@ export default function PassportUploader() {
   const [otp, setOtp] = useState<OtpPayload>();
   const [timeLeft, setTimeLeft] = useState<number>(OTP_DURATION_SECONDS);
   const [error, setError] = useState<string | null>(null);
+  const [aesKey, setAesKey] = useState<CryptoKey | null>(null);
+  const [aesKeyB64, setAesKeyB64] = useState<string>("");
 
   const hasRequestedBundle = useRef(false);
 
@@ -74,7 +76,9 @@ export default function PassportUploader() {
   useEffect(() => {
     if (!sessionId || passportStage === "complete") return;
 
-    const evtSource = new EventSource(`/api/triage/events?sessionId=${sessionId}`);
+    const evtSource = new EventSource(
+      `/api/triage/events?sessionId=${sessionId}`
+    );
 
     evtSource.onmessage = (event) => {
       if (event.data === "PHONE_CONNECTED") {
@@ -111,7 +115,9 @@ export default function PassportUploader() {
 
   const renderContent = useMemo(() => {
     if (passportStage === "start") {
-      return <PassportStart otp={otp} timeLeft={timeLeft} onRefresh={refreshQR} />;
+      return (
+        <PassportStart otp={otp} timeLeft={timeLeft} onRefresh={refreshQR} />
+      );
     }
 
     if (passportStage === "waiting") {
