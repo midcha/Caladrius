@@ -14,27 +14,36 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Connected to MongoDB Atlas"))
   .catch(err => console.error("MongoDB connection error:", err));
 
-// GET all patients, sorted by priority
+/**
+ * GET all patients
+ * Sorted by urgency_level ascending (1 = Emergency, 5 = Routine)
+ */
 app.get("/api/patients", async (req, res) => {
   try {
-    const patients = await Patient.find().sort({ priority: 1 });
+    const patients = await Patient.find().sort({ urgency_level: 1 });
     res.json(patients);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// PATCH reorder patients
-// Expects: { orderedIds: ["id1", "id2", ...] }
+/**
+ * PATCH reorder patients manually
+ * Expects: { orderedIds: ["id1", "id2", ...] }
+ * Updates a "priority_order" field that you can add to your schema if you want to keep drag-drop order separate from urgency_level.
+ */
 app.patch("/api/patients/reorder", async (req, res) => {
   try {
     const { orderedIds } = req.body;
-    if (!Array.isArray(orderedIds)) return res.status(400).json({ error: "orderedIds must be an array" });
+    if (!Array.isArray(orderedIds)) {
+      return res.status(400).json({ error: "orderedIds must be an array" });
+    }
 
+    // Optional: Add a field `priority_order` in schema if you want drag-drop override
     const bulkOps = orderedIds.map((id, index) => ({
       updateOne: {
         filter: { _id: id },
-        update: { priority: index + 1 },
+        update: { priority_order: index + 1 }, // <- add this field in schema if you want
       },
     }));
 

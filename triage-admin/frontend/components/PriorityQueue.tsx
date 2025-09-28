@@ -16,19 +16,27 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import { SortableItem } from "../src/app/sortable-item"; // adjust path if needed
+import { SortableItem } from "../src/app/sortable-item"; // make sure this uses Solution 2 code
 import PriorityBadge from "./PriorityBadge";
-
+import PatientDetailsPanel from "./PatientDetailsPanel";
 
 type Patient = {
   _id: string;
   name: string;
   symptoms: string;
-  priority: number;
+  urgency_level: number;       // 1–5
+  urgency_level_text: string;  // "Emergency", "High", etc.
+  differential_diagnosis?: {
+    rank: number;
+    diagnosis: string;
+    probability_percent: number;
+  }[];
+  notes?: string;
 };
 
 export default function PriorityQueue() {
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   // Fetch patients from backend
   useEffect(() => {
@@ -53,6 +61,7 @@ export default function PriorityQueue() {
 
   const handleDragEnd = async (event: any) => {
     const { active, over } = event;
+    if (!over) return;
 
     if (active.id !== over.id) {
       const oldIndex = patients.findIndex((p) => p._id === active.id);
@@ -76,7 +85,7 @@ export default function PriorityQueue() {
   };
 
   return (
-    <div className="w-full max-w-md space-y-4">
+    <div className="w-full max-w-md relative">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -87,8 +96,12 @@ export default function PriorityQueue() {
           strategy={verticalListSortingStrategy}
         >
           {patients.map((patient, idx) => (
-            <SortableItem key={patient._id} id={patient._id}>
-              <div className="p-4 rounded-xl shadow bg-white flex justify-between items-center">
+            <SortableItem
+              key={patient._id}
+              id={patient._id}
+              onClick={() => setSelectedPatient(patient)} // works with Solution 2
+            >
+              <div className="p-4 rounded-xl shadow bg-white flex justify-between items-center hover:bg-gray-50">
                 <div>
                   <p className="font-semibold text-gray-800">
                     {idx + 1}. {patient.name}
@@ -96,13 +109,22 @@ export default function PriorityQueue() {
                   <p className="text-sm text-gray-600">
                     Symptoms: {patient.symptoms}
                   </p>
-                </div>                         
-                <PriorityBadge level={patient.priority} />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Urgency: {patient.urgency_level_text}
+                  </p>
+                </div>
+                <PriorityBadge level={patient.urgency_level} />
               </div>
             </SortableItem>
           ))}
         </SortableContext>
       </DndContext>
+
+      {/* Pop-out patient details panel */}
+      <PatientDetailsPanel
+        patient={selectedPatient}
+        onClose={() => setSelectedPatient(null)}
+      />
     </div>
   );
 }

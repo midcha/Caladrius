@@ -2,9 +2,25 @@ import PriorityQueue from "../../components/PriorityQueue";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center p-8 bg-gray-50">
-      <h1 className="text-3xl font-bold mb-6 text-blue-700">ED Triage Priority Queue</h1>
-      <PriorityQueue />
+    <main className="caladrius-shell">
+      <div className="caladrius-container">
+        <header className="panel">
+          <p className="kicker">Emergency Department</p>
+          <h1 className="title">ED Triage Priority Queue</h1>
+          <div className="titleBar" />
+          <p className="sub">Manage incoming patients and prioritize care. Use caution — triage decisions affect outcomes.</p>
+        </header>
+
+        <div className="layout-grid">
+          <section className="list-column">
+            <div className="panel">
+              <PriorityQueue />
+            </div>
+          </section>
+
+          <aside className="spacer-column" />
+        </div>
+      </div>
     </main>
   );
 }
