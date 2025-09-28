@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useTriage } from "./TriageProvider";
 import ui from "./ui.module.css";
 import s from "./QuestionPrompt.module.css";
@@ -46,7 +47,7 @@ export default function QuestionPrompt() {
             {/* Caladrius Character */}
             <div className={s.caladriusIntro}>
               <div className={s.caladriusAvatar}>
-                <img src="/caladrius.png" alt="Caladrius" className={s.caladriusImage} />
+                <Image src="/caladrius.png" alt="Caladrius" className={s.caladriusImage} width={40} height={40} priority />
               </div>
               <div className={s.caladriusText}>
                 <p className={ui.kicker}>Medical Assessment</p>

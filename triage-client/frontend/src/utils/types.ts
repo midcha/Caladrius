@@ -18,7 +18,7 @@ export type BackendQuestion = {
 
 export type DiagnosisResult = {
   type: 'diagnosis';
-  diagnosis: any;
+  diagnosis: unknown;
   status: 'completed';
 };
 
@@ -67,6 +67,11 @@ export type PatientData = {
   passportAttachments?: PassportAttachment[];
   symptoms: string[];
   medicalRecords?: string;
+};
+
+// Minimal shape for medical JSON data extracted from passports
+export type MedicalData = {
+  [key: string]: unknown;
 };
 
 export type TriagePhase =

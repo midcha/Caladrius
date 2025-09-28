@@ -60,7 +60,7 @@ export default function SymptomsInput() {
         <p className={ui.kicker}>Step 3 of 3</p>
         <h2 className={ui.title}>Tell us about your symptoms</h2>
         <p className={ui.sub}>
-          Describe what you're experiencing. Be as specific as possible - this helps us provide better care recommendations.
+          Describe what you&apos;re experiencing. Be as specific as possible - this helps us provide better care recommendations.
         </p>
       </div>
       

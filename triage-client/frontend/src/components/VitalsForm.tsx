@@ -6,7 +6,6 @@ import type { Vitals } from "../utils/types";
 import { validateVitals } from "../utils/validators";
 import ui from "./ui.module.css";
 import s from "./VitalsForm.module.css";
-import Spinner from "./Spinner";
 
 const emptyVitals: Vitals = {
   temperature: "",
@@ -18,7 +17,7 @@ const emptyVitals: Vitals = {
 };
 
 export default function VitalsForm() {
-  const { updateVitals, patientData, busy } = useTriage();
+  const { updateVitals, patientData} = useTriage();
   const [v, setV] = useState<Vitals>(patientData.vitals || emptyVitals);
   const [touched, setTouched] = useState<Record<keyof Vitals, boolean>>({
     temperature: false,
@@ -29,7 +28,7 @@ export default function VitalsForm() {
     spo2: false,
   });
 
-  const { ok, errors } = useMemo(() => validateVitals(v), [v]);
+  const { errors } = useMemo(() => validateVitals(v), [v]);
 
   const onChange =
     (k: keyof Vitals) =>

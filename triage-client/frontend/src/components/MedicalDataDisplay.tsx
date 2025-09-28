@@ -2,8 +2,67 @@
 
 import React from 'react';
 
+interface Condition {
+  name?: string;
+  diagnosis?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
+interface Visit {
+  date?: string;
+  purpose?: string;
+  doctor?: string;
+  [key: string]: unknown;
+}
+
+interface FamilyHistory {
+  relation?: string;
+  condition?: string;
+  [key: string]: unknown;
+}
+
+interface Insurance {
+  provider?: string;
+  policyNumber?: string;
+  [key: string]: unknown;
+}
+
+interface MedicalData {
+  patient?: PatientInfo;
+  medicalHistory?: MedicalHistory & {
+    conditions?: Condition[];
+    chronicConditions?: Condition[];
+    visits?: Visit[];
+    familyHistory?: FamilyHistory[];
+    insurance?: Insurance[];
+  };
+  prescriptions?: Prescription[];
+  emergencyContacts?: EmergencyContact[];
+  allergies?: Allergy[];
+  conditions?: Condition[];
+  chronicConditions?: Condition[];
+  visits?: Visit[];
+  familyHistory?: FamilyHistory[];
+  insurance?: Insurance[];
+  // Allow for patient info at root level
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  sex?: string;
+  gender?: string;
+  ethnicity?: string;
+  race?: string;
+  dob?: string;
+  bloodType?: string;
+  age?: number;
+  mrn?: string;
+  ssn?: string;
+  [key: string]: unknown;
+}
+
 interface MedicalDataDisplayProps {
-  data: any;
+  data: MedicalData;
 }
 
 interface PatientInfo {
@@ -14,7 +73,7 @@ interface PatientInfo {
   dob?: string;
   bloodType?: string;
   age?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface Prescription {
@@ -28,7 +87,7 @@ interface Prescription {
   endDate?: string;
   name?: string;
   dosage?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface EmergencyContact {
@@ -36,7 +95,7 @@ interface EmergencyContact {
   relationship?: string;
   phone?: string;
   email?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface Allergy {
@@ -45,14 +104,14 @@ interface Allergy {
   severity?: string;
   treatment?: string;
   notes?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface MedicalHistory {
   prescriptions?: Prescription[];
   allergies?: Allergy[];
   emergencyContacts?: EmergencyContact[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 const formatDate = (dateString: string | undefined) => {
@@ -109,6 +168,14 @@ const InfoRow: React.FC<{ label: string; value: string | number | undefined; imp
   </div>
 );
 
+const safeString = (value: unknown): string | undefined => {
+  return typeof value === 'string' ? value : undefined;
+};
+
+const safeNumber = (value: unknown): number | undefined => {
+  return typeof value === 'number' ? value : undefined;
+};
+
 export default function MedicalDataDisplay({ data }: MedicalDataDisplayProps) {
   if (!data || typeof data !== 'object') {
     return (
@@ -119,33 +186,39 @@ export default function MedicalDataDisplay({ data }: MedicalDataDisplayProps) {
   }
 
   // Extract patient information (can be nested or at root level)
-  const patient: PatientInfo = data.patient || data;
-  const medicalHistory: MedicalHistory = patient.medicalHistory || data.medicalHistory || data;
+  const patient: PatientInfo = (data.patient as PatientInfo) || (data as PatientInfo);
+  const medicalHistory = (patient.medicalHistory || data.medicalHistory || {}) as MedicalHistory & {
+    conditions?: Condition[];
+    chronicConditions?: Condition[];
+    visits?: Visit[];
+    familyHistory?: FamilyHistory[];
+    insurance?: Insurance[];
+  };
 
   // Extract main data arrays - handle both array and single object cases
-  const prescriptions = Array.isArray(medicalHistory.prescriptions) 
+  const prescriptions = (Array.isArray(medicalHistory.prescriptions) 
     ? medicalHistory.prescriptions 
     : Array.isArray(data.prescriptions) 
     ? data.prescriptions 
     : medicalHistory.prescriptions || data.prescriptions 
     ? [medicalHistory.prescriptions || data.prescriptions]
-    : [];
+    : []).filter((item): item is Prescription => item != null);
     
-  const emergencyContacts = Array.isArray(medicalHistory.emergencyContacts) 
+  const emergencyContacts = (Array.isArray(medicalHistory.emergencyContacts) 
     ? medicalHistory.emergencyContacts 
     : Array.isArray(data.emergencyContacts) 
     ? data.emergencyContacts 
     : medicalHistory.emergencyContacts || data.emergencyContacts 
     ? [medicalHistory.emergencyContacts || data.emergencyContacts]
-    : [];
+    : []).filter((item): item is EmergencyContact => item != null);
     
-  const allergies = Array.isArray(medicalHistory.allergies) 
+  const allergies = (Array.isArray(medicalHistory.allergies) 
     ? medicalHistory.allergies 
     : Array.isArray(data.allergies) 
     ? data.allergies 
     : medicalHistory.allergies || data.allergies 
     ? [medicalHistory.allergies || data.allergies]
-    : [];
+    : []).filter((item): item is Allergy => item != null);
 
   return (
     <div style={styles.container}>
@@ -154,16 +227,16 @@ export default function MedicalDataDisplay({ data }: MedicalDataDisplayProps) {
         <InfoCard highlighted>
           <InfoRow 
             label="Full Name" 
-            value={`${patient.firstName || ''} ${patient.lastName || ''}`.trim() || patient.name} 
+            value={`${patient.firstName || ''} ${patient.lastName || ''}`.trim() || safeString(patient.name)} 
             important 
           />
           <InfoRow label="Date of Birth" value={formatDate(patient.dob)} />
-          <InfoRow label="Age" value={patient.age} />
-          <InfoRow label="Sex" value={patient.sex || patient.gender} />
-          <InfoRow label="Ethnicity" value={patient.ethnicity || patient.race} />
+          <InfoRow label="Age" value={safeNumber(patient.age)} />
+          <InfoRow label="Sex" value={safeString(patient.sex) || safeString(patient.gender)} />
+          <InfoRow label="Ethnicity" value={safeString(patient.ethnicity) || safeString(patient.race)} />
           <InfoRow label="Blood Type" value={patient.bloodType} important />
-          {patient.mrn && <InfoRow label="Medical Record Number" value={patient.mrn} />}
-          {patient.ssn && <InfoRow label="SSN" value={patient.ssn} />}
+          {safeString(patient.mrn) && <InfoRow label="Medical Record Number" value={safeString(patient.mrn)} />}
+          {safeString(patient.ssn) && <InfoRow label="SSN" value={safeString(patient.ssn)} />}
         </InfoCard>
       </InfoSection>
 
@@ -229,59 +302,81 @@ export default function MedicalDataDisplay({ data }: MedicalDataDisplayProps) {
       </InfoSection>
 
       {/* Medical Conditions */}
-      {(medicalHistory.conditions || data.conditions || medicalHistory.chronicConditions || data.chronicConditions) && (
-        <InfoSection title="Medical Conditions">
-          {(medicalHistory.conditions || data.conditions || medicalHistory.chronicConditions || data.chronicConditions || []).map((condition: any, index: number) => (
-            <InfoCard key={index}>
-              <InfoRow label="Condition" value={condition.name || condition} important />
-              <InfoRow label="Diagnosis Date" value={formatDate(condition.diagnosisDate)} />
-              <InfoRow label="Status" value={condition.status} />
-              <InfoRow label="Notes" value={condition.notes} />
-            </InfoCard>
-          ))}
-        </InfoSection>
-      )}
+      {(() => {
+        const conditions = [
+          ...(Array.isArray(medicalHistory.conditions) ? medicalHistory.conditions : []),
+          ...(Array.isArray(data.conditions) ? data.conditions : []),
+          ...(Array.isArray(medicalHistory.chronicConditions) ? medicalHistory.chronicConditions : []),
+          ...(Array.isArray(data.chronicConditions) ? data.chronicConditions : [])
+        ].filter((item): item is Condition => item != null);
+        
+        return conditions.length > 0 ? (
+          <InfoSection title="Medical Conditions">
+            {conditions.map((condition, index: number) => (
+              <InfoCard key={index}>
+                <InfoRow label="Condition" value={condition.name || safeString(condition)} important />
+                <InfoRow label="Diagnosis Date" value={formatDate(safeString(condition.diagnosis))} />
+                <InfoRow label="Status" value={safeString(condition.status)} />
+                <InfoRow label="Notes" value={safeString(condition.notes)} />
+              </InfoCard>
+            ))}
+          </InfoSection>
+        ) : null;
+      })()}
 
       {/* Additional Medical Information */}
-      {medicalHistory.visits && medicalHistory.visits.length > 0 && (
-        <InfoSection title={`Recent Visits (${medicalHistory.visits.length})`}>
-          {medicalHistory.visits.slice(0, 3).map((visit: any, index: number) => (
-            <InfoCard key={index}>
-              <InfoRow label="Date" value={formatDate(visit.date)} />
-              <InfoRow label="Reason" value={visit.reason} />
-              <InfoRow label="Notes" value={visit.notes} />
-            </InfoCard>
-          ))}
-        </InfoSection>
-      )}
+      {(() => {
+        const visits = Array.isArray(medicalHistory.visits) ? medicalHistory.visits : [];
+        return visits.length > 0 ? (
+          <InfoSection title={`Recent Visits (${visits.length})`}>
+            {visits.slice(0, 3).map((visit, index: number) => (
+              <InfoCard key={index}>
+                <InfoRow label="Date" value={formatDate(safeString(visit.date))} />
+                <InfoRow label="Reason" value={safeString(visit.reason)} />
+                <InfoRow label="Notes" value={safeString(visit.notes)} />
+              </InfoCard>
+            ))}
+          </InfoSection>
+        ) : null;
+      })()}
       
       {/* Family History */}
-      {(medicalHistory.familyHistory || data.familyHistory) && (
-        <InfoSection title="Family History">
-          {(medicalHistory.familyHistory || data.familyHistory || []).map((history: any, index: number) => (
-            <InfoCard key={index}>
-              <InfoRow label="Condition" value={history.condition} />
-              <InfoRow label="Relation" value={history.relation} />
-              <InfoRow label="Diagnosis Age" value={history.diagnosisAge} />
-            </InfoCard>
-          ))}
-        </InfoSection>
-      )}
+      {(() => {
+        const familyHistory = [
+          ...(Array.isArray(medicalHistory.familyHistory) ? medicalHistory.familyHistory : []),
+          ...(Array.isArray(data.familyHistory) ? data.familyHistory : [])
+        ].filter((item): item is FamilyHistory => item != null);
+        
+        return familyHistory.length > 0 ? (
+          <InfoSection title="Family History">
+            {familyHistory.map((history, index: number) => (
+              <InfoCard key={index}>
+                <InfoRow label="Condition" value={safeString(history.condition)} />
+                <InfoRow label="Relation" value={safeString(history.relation)} />
+                <InfoRow label="Diagnosis Age" value={safeString(history.diagnosisAge)} />
+              </InfoCard>
+            ))}
+          </InfoSection>
+        ) : null;
+      })()}
 
       {/* Insurance Information */}
-      {medicalHistory.insurance && medicalHistory.insurance.length > 0 && (
-        <InfoSection title="Insurance Information">
-          {medicalHistory.insurance.map((ins: any, index: number) => (
-            <InfoCard key={index}>
-              <InfoRow label="Provider" value={ins.providerName} important />
-              <InfoRow label="Policy Number" value={ins.policyNumber} />
-              <InfoRow label="Group Number" value={ins.groupNumber} />
-              <InfoRow label="Coverage Start" value={formatDate(ins.coverageStart)} />
-              <InfoRow label="Coverage End" value={formatDate(ins.coverageEnd)} />
-            </InfoCard>
-          ))}
-        </InfoSection>
-      )}
+      {(() => {
+        const insurance = Array.isArray(medicalHistory.insurance) ? medicalHistory.insurance : [];
+        return insurance.length > 0 ? (
+          <InfoSection title="Insurance Information">
+            {insurance.map((ins, index: number) => (
+              <InfoCard key={index}>
+                <InfoRow label="Provider" value={safeString(ins.provider) || safeString(ins.providerName)} important />
+                <InfoRow label="Policy Number" value={safeString(ins.policyNumber)} />
+                <InfoRow label="Group Number" value={safeString(ins.groupNumber)} />
+                <InfoRow label="Coverage Start" value={formatDate(safeString(ins.coverageStart))} />
+                <InfoRow label="Coverage End" value={formatDate(safeString(ins.coverageEnd))} />
+              </InfoCard>
+            ))}
+          </InfoSection>
+        ) : null;
+      })()}
 
       {/* Raw JSON for debugging (collapsible) */}
       <details style={styles.debugSection}>

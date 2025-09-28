@@ -85,6 +85,34 @@
   100% { transform: rotate(360deg); }
 }
 
+/* Variant styles */
+.variantHeartbeat {
+  animation: ringSpin 1.2s ease-in-out infinite;
+  border-style: solid;
+}
+
+.variantSpinner {
+  animation: ringSpin 0.9s linear infinite;
+  border-top-color: #06b6d4;
+  border-right-color: #06b6d4;
+}
+
+.variantPulse {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.85; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.variantDots {
+  /* subtle dot effect: use box-shadow to simulate dots around ring */
+  animation: ringSpin 1.6s linear infinite;
+  box-shadow: 0 0 0 0 rgba(8,145,178,0.0);
+}
+
 .message {
   text-align: center;
   font-size: 16px;

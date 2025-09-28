@@ -64,7 +64,7 @@ export async function readZip(key: string): Promise<ZipContents> {
         result.json = parsed;
       } else if (file.path === "attachments/index.json") {
         const files = Array.isArray(parsed?.files) ? parsed.files : [];
-        result.attachments = files.map((item: any) => ({
+        result.attachments = files.map((item: Partial<AttachmentMetadata> & { id: string; filename: string }) => ({
           id: item?.id,
           filename: item?.filename,
           mime: item?.mime,

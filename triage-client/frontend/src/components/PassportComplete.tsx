@@ -1,6 +1,6 @@
 import { imageDataToUrl } from "@/utils/helpers";
 import Image from "next/image";
-import type { PassportAttachment, PassportBundle } from "@/utils/types";
+import type { PassportAttachment, PassportBundle, MedicalData } from "@/utils/types";
 import MedicalDataDisplay from "./MedicalDataDisplay";
 
 interface PassportCompleteProps {
@@ -87,7 +87,7 @@ export default function PassportComplete({ data }: PassportCompleteProps) {
   return (
     <div style={styles.container}>
       <h2 style={styles.heading}>Medical Records</h2>
-      <MedicalDataDisplay data={data.json} />
+  <MedicalDataDisplay data={data.json as MedicalData} />
       {data.attachments.length > 0 ? (
         <div style={styles.attachmentsSection}>
           <h3 style={styles.subheading}>Uploaded Attachments</h3>

@@ -4,9 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import type {
@@ -15,10 +13,8 @@ import type {
   Vitals,
   PatientData,
   DiagnosisResult,
-  ApiResponse,
   PassportBundle,
   PassportStage,
-  PassportAttachment,
 } from "../utils/types";
 import { medicalApi } from "../utils/api";
 import { extractPatientName } from "../utils/passport";
@@ -296,7 +292,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       
       // Send confirm with extracted patient name
       await medicalApi.confirmDiagnosis(sessionId, confirm, fullName);
-    } catch (err) {
+    } catch {
       // Intentionally ignore errors from confirm to avoid disrupting UI flow
       // You can log if needed: console.error(err);
     } finally {

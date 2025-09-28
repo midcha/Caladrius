@@ -27,7 +27,8 @@ const calmingMessages = [
 export default function LoadingAnimation({ 
   message, 
   showCalmingMessage = true, 
-  size = "medium",
+  size = "medium"
+  ,
   variant = "heartbeat"
 }: LoadingAnimationProps) {
   const [currentMessage, setCurrentMessage] = useState(
@@ -56,6 +57,7 @@ export default function LoadingAnimation({
   const logoPx = size === 'small' ? 28 : size === 'large' ? 44 : 36;
   const circleSizeClass = size === 'small' ? styles.brandCircleSmall : size === 'large' ? styles.brandCircleLarge : styles.brandCircleMedium;
   const ringSizeClass = size === 'small' ? styles.brandRingSmall : size === 'large' ? styles.brandRingLarge : styles.brandRingMedium;
+  const variantClass = variant === 'pulse' ? styles.variantPulse : variant === 'spinner' ? styles.variantSpinner : variant === 'dots' ? styles.variantDots : styles.variantHeartbeat;
 
   return (
     <div className={`${styles.container} ${styles[size]}`}>
@@ -63,7 +65,7 @@ export default function LoadingAnimation({
         <div className={`${styles.brandCircle} ${circleSizeClass}`}>
           <Image src="/caladrius.png" alt="Caladrius" width={logoPx} height={logoPx} />
         </div>
-        <div className={`${styles.brandRing} ${ringSizeClass}`} />
+  <div className={`${styles.brandRing} ${ringSizeClass} ${variantClass}`} />
       </div>
       {(showCalmingMessage || message) && (
         <p className={`${styles.message} ${styles.fadeIn}`}>

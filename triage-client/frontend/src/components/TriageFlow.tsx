@@ -53,7 +53,6 @@ export default function TriageFlow() {
           <StepTransition 
             isLoading={busy} 
             loadingMessage="Preparing your health assessment..."
-            variant="heartbeat"
           >
             <VitalsForm />
           </StepTransition>
@@ -73,7 +72,6 @@ export default function TriageFlow() {
           <StepTransition 
             isLoading={busy} 
             loadingMessage="Processing your medical history..."
-            variant="pulse"
           >
             <PassportUploader />
           </StepTransition>
@@ -94,7 +92,6 @@ export default function TriageFlow() {
           <StepTransition
             isLoading={busy}
             loadingMessage="Double-checking your profile..."
-            variant="heartbeat"
           >
             <ConfirmName />
           </StepTransition>
@@ -115,7 +112,6 @@ export default function TriageFlow() {
           <StepTransition
             isLoading={busy}
             loadingMessage="Preparing your medical records..."
-            variant="pulse"
           >
             {patientData.passportBundle ? (
               <PassportComplete data={patientData.passportBundle} />
@@ -145,7 +141,6 @@ export default function TriageFlow() {
           <StepTransition 
             isLoading={busy} 
             loadingMessage="Analyzing your symptoms..."
-            variant="dots"
           >
             <SymptomsInput />
           </StepTransition>
@@ -163,7 +158,6 @@ export default function TriageFlow() {
         <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <LoadingAnimation 
             message="Creating personalized questions based on your information..."
-            variant="heartbeat"
             size="large"
           />
         </div>
@@ -174,7 +168,6 @@ export default function TriageFlow() {
         <StepTransition 
           isLoading={busy} 
           loadingMessage="Preparing your next question..."
-          variant="spinner"
         >
           <QuestionPrompt />
         </StepTransition>
