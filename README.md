@@ -4,6 +4,21 @@
 
 Caladrius is a comprehensive AI-powered medical triage system that streamlines emergency department operations through intelligent patient assessment, priority-based queuing, and seamless medical record integration.
 
+## Video Demo
+
+**Watch Caladrius in Action**
+
+[![Caladrius Demo Video](https://img.youtube.com/vi/VIDEO_ID_HERE/maxresdefault.jpg)](https://youtu.be/1fI_w06EoZQ?si=qV1rvBV5mpBK8hJR)
+
+*Click the image above to watch our full system demonstration, showcasing the mobile app, triage client, and admin dashboard working together.*
+
+**Demo Highlights:**
+- Patient data collection via mobile app
+- AI-powered diagnostic questioning
+- Real-time triage priority assignment
+- Hospital staff dashboard management
+- Complete end-to-end workflow
+
 ## Project Structure
 
 This monorepo contains multiple applications and services:
