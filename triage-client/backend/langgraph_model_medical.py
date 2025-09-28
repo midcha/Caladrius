@@ -117,7 +117,7 @@ def agent_node(state: State):
     # Balanced priority areas focusing equally on symptoms and medical history
     if has_substantial_history:
         # When medical history is available, balance symptom assessment with history correlation
-        priority_areas = ["severity", "history_correlation", "quality", "triggers", "associated_symptoms", "timing", "context"]
+        priority_areas = ["severity", "history_correlation", "history_correlation", "quality", "triggers", "associated_symptoms", "timing", "context"]
     else:
         # When minimal history, focus on symptom assessment with basic history gathering
         priority_areas = ["severity", "quality", "triggers", "associated_symptoms", "timing", "context", "basic_history"]
@@ -143,17 +143,9 @@ def agent_node(state: State):
     else:
         coverage_guidance += "STRATEGY: Focus on symptom assessment while gathering essential medical context.\n"
     coverage_guidance += history_guidance
-    
-    # Determine if we should ask more questions or proceed to diagnosis
-    # Adjust questioning based on medical history availability
-    if has_substantial_history:
-        # With good medical history, fewer questions needed - focus on correlation and severity
-        max_questions = 4
-        min_questions_threshold = 2
-    else:
-        # Without substantial history, need more questions for safety
-        max_questions = 6
-        min_questions_threshold = 3
+        
+    max_questions = 6
+    min_questions_threshold = 3
         
     # Balanced completion criteria requiring both symptom and history assessment
     has_minimum_info = len(questions_asked) >= min_questions_threshold
