@@ -16,8 +16,9 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import { SortableItem } from "../src/app/sortable-item"; // make sure this uses Solution 2 code
+import { SortableItem } from "../src/app/sortable-item"; // keep drag on row only
 import PriorityBadge from "./PriorityBadge";
+import styles from "./ui.module.css";
 import PatientDetailsPanel from "./PatientDetailsPanel";
 
 type Patient = {
@@ -31,6 +32,9 @@ type Patient = {
     diagnosis: string;
     probability_percent: number;
   }[];
+  clinical_summary?: string;
+  disclaimer?: string;
+  age?: number;
   notes?: string;
 };
 
@@ -64,7 +68,9 @@ export default function PriorityQueue() {
   }, []);
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 }, // must move 6px before drag starts
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -96,46 +102,71 @@ export default function PriorityQueue() {
   };
 
   return (
-    <div className="w-full max-w-md relative">
-      <DndContext
+    <div className="w-full h-full flex items-stretch gap-6 overflow-y-auto">
+      <div className="flex-1 min-w-0 h-full pr-1 flex flex-col">
+        <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={patients.map((p) => p._id)}
-          strategy={verticalListSortingStrategy}
         >
-          {patients.map((patient, idx) => (
-            <SortableItem
-              key={patient._id}
-              id={patient._id}
-              onClick={() => setSelectedPatient(patient)} // works with Solution 2
-            >
-              <div className="p-4 rounded-xl shadow bg-white flex justify-between items-center hover:bg-gray-50">
-                <div>
-                  <p className="font-semibold text-gray-800">
-                    {idx + 1}. {patient.name}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Symptoms: {patient.symptoms}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Urgency: {patient.urgency_level_text}
-                  </p>
+          <SortableContext
+            items={patients.map((p) => p._id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {patients.map((patient, idx) => (
+              <SortableItem key={patient._id} id={patient._id}>
+                <div className={`${styles.card} flex justify-between items-center`}>
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      {idx + 1}. {patient.name}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Symptoms: {patient.symptoms}
+                    </p>
+                    {/* Urgency text removed; the badge conveys urgency */}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <PriorityBadge level={patient.urgency_level} />
+                    <button
+                      type="button"
+                      className={`${styles.btn} ${styles.btnGhost}`}
+                      onClick={async (e) => {
+                        e.stopPropagation(); // don't trigger drag
+                        try {
+                          // Use Next.js API route (filesystem); proxy only catches unmatched paths
+                          const res = await fetch(`/api/patients/${patient._id}`, { cache: 'no-store' });
+                          if (!res.ok) {
+                            const text = await res.text();
+                            console.error('Failed to load patient details', res.status, text);
+                            setSelectedPatient(patient);
+                            return;
+                          }
+                          const full = await res.json();
+                          setSelectedPatient(full);
+                        } catch (err) {
+                          console.error('Error fetching patient details', err);
+                          setSelectedPatient(patient);
+                        }
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      Details
+                    </button>
+                  </div>
                 </div>
-                <PriorityBadge level={patient.urgency_level} />
-              </div>
-            </SortableItem>
-          ))}
-        </SortableContext>
-      </DndContext>
+              </SortableItem>
+            ))}
+          </SortableContext>
+        </DndContext>
+      </div>
 
-      {/* Pop-out patient details panel */}
-      <PatientDetailsPanel
-        patient={selectedPatient}
-        onClose={() => setSelectedPatient(null)}
-      />
+      {/* Side-by-side patient details panel */}
+      <div className="w-[22rem] shrink-0 h-full pb-4">
+        <PatientDetailsPanel
+          patient={selectedPatient}
+          onClose={() => setSelectedPatient(null)}
+        />
+      </div>
     </div>
   );
 }

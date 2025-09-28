@@ -1,14 +1,6 @@
 import { NextConfig } from 'next';
 
-const nextConfig: NextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:5000/api/:path*', // forwards Next.js API calls to Express backend
-      },
-    ];
-  },
-};
+// Use only Next.js internal API routes (no external backend proxy)
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

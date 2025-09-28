@@ -16,6 +16,26 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+### Environment
+
+Create a `.env.local` in this folder with:
+
+```
+MONGODB_URI=mongodb+srv://<user>:<pass>@<cluster>/<db>?retryWrites=true&w=majority
+```
+
+The admin dashboard connects directly to MongoDB via Mongoose.
+
+### Local data API
+
+- The file-system API under `/api` is served by Next.js and talks directly to Mongo via Mongoose.
+	- Examples:
+		- `GET /api/patients` — list patients
+		- `GET /api/patients/[id]` — get a patient by Mongo `_id`
+		- `PATCH /api/patients/reorder` — update manual priority order
+
+Note: There is no proxy to an external Express server. All `/api/*` routes are implemented in this Next.js app (see `src/app/api`).
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

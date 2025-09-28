@@ -1,0 +1,138 @@
+/* Caladrius Admin UI refinements */
+
+.card{
+	background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+	border: 1px solid rgba(2,6,23,0.06);
+	border-radius: 16px;
+	padding: 16px 18px;
+	box-shadow:
+		0 1px 2px rgba(2,6,23,0.04),
+		0 6px 20px rgba(2,6,23,0.06);
+	transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+	will-change: transform;
+}
+.card:hover{
+	transform: translateY(-2px);
+	box-shadow:
+		0 6px 14px rgba(2,6,23,0.08),
+		0 18px 36px rgba(2,6,23,0.08);
+}
+
+.badge{
+	display:inline-flex;
+	align-items:center;
+	padding: 10px 14px;
+	border-radius: 9999px;
+	font-weight: 700;
+	font-size: 12px;
+	letter-spacing: .02em;
+	border: 1px solid rgba(2,6,23,0.06);
+	box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+}
+.badgePill{
+	height: 32px;
+	padding: 0 12px; /* override base padding to lock height */
+	white-space: nowrap; /* keep on one line so height is stable */
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.badgeCompact{
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border-radius: 9999px;
+	display: grid;
+	place-items: center;
+	font-weight: 800;
+	font-size: 12px;
+}
+.badgeL1{ background: #ffe6e8; color: #b91c1c; }
+.badgeL2{ background: #fff0e1; color: #c2410c; }
+.badgeL3{ background: #fff8d9; color: #a16207; }
+.badgeL4{ background: #e8faf1; color: #065f46; }
+.badgeL5{ background: #eaf5ff; color: #1e40af; }
+
+/* Slide-out details panel with softer look */
+.detailsPanel{
+	background: #ffffff;
+	border: 1px solid rgba(2,6,23,0.06);
+	border-radius: 16px;
+	box-shadow: 0 10px 28px rgba(2,6,23,0.10);
+	display: none; /* hidden by default */
+}
+.detailsPanelOpen{ display: block; }
+.detailsHeader{
+	display:flex; justify-content:space-between; align-items:center;
+	padding: 16px 16px; border-bottom:1px solid rgba(2,6,23,0.08);
+}
+.detailsBody{ padding:16px; overflow: visible; }
+
+/* Add generous space between sections inside details panel */
+.detailsBody > div + div{ margin-top: 20px; }
+
+/* Minimal ghost button for row actions */
+.btn{ appearance:none; border:0; cursor:pointer; font-weight:600; border-radius:10px; }
+.btnGhost{
+	background: linear-gradient(180deg,#ffffff 0%,#f7f9ff 100%);
+	border: 1px solid rgba(2,6,23,0.08);
+	color: #0f172a;
+	padding: 8px 12px;
+	font-size: 12px;
+	transition: box-shadow .18s ease, transform .12s ease, background .2s ease;
+}
+.btnGhost:hover{ box-shadow: 0 6px 16px rgba(2,6,23,0.08); transform: translateY(-1px); }
+.btnGhost:active{ transform: translateY(0); }
+
+/* Differential diagnosis list styling */
+.dxList{ display:grid; gap:12px; margin: 8px 0 0 0 }
+.dxItem{
+	padding:12px;
+	border:1px solid rgba(2,6,23,0.06);
+	border-radius:12px;
+	background: linear-gradient(180deg,#ffffff 0%, #f9fbff 100%);
+}
+.dxHead{ display:flex; align-items:center; justify-content:space-between; gap:12px }
+.dxHeadButton{ width:100%; text-align:left; background:transparent; border:0; padding:0; cursor:pointer }
+.dxTitle{ font-weight:600; color:#0f172a; }
+.probBadge{
+	display:inline-flex; align-items:center; justify-content:center;
+	min-width: 54px;
+	padding: 6px 10px;
+	border-radius: 999px;
+	font-weight: 700; font-size: 12px;
+	color: #fff;
+	box-shadow: 0 6px 14px rgba(2,6,23,0.12), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.probTrack{
+	margin-top:8px;
+	height: 8px;
+	background: #eef2f7;
+	border: 1px solid rgba(2,6,23,0.06);
+	border-radius: 999px;
+	overflow: hidden;
+}
+.probFill{
+	height: 100%;
+	border-radius: inherit;
+	transition: width .28s ease;
+}
+.chevron{ transition: transform .2s ease; color:#64748b; font-size:14px }
+.chevronOpen{ transform: rotate(180deg); }
+.dxBody{ padding-top:10px; display:grid; gap:12px }
+.subTitle{ font-weight:600; color:#0f172a; font-size:13px; margin-bottom:4px }
+.subList{ margin:0; padding-left:18px; color:#334155 }
+.subText{ color:#334155; margin:0 }
+
+/* Symptom chips */
+.chipGroup{ display:flex; flex-wrap: wrap; gap:8px; margin-top:6px }
+.chip{
+	background: linear-gradient(180deg,#ffffff 0%,#f7f9ff 100%);
+	border: 1px solid rgba(2,6,23,0.08);
+	border-radius: 9999px;
+	font-size: 12px;
+	font-weight: 600;
+	padding: 6px 10px;
+	color: #0f172a;
+	box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
