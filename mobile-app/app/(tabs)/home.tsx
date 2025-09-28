@@ -15,9 +15,9 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 /* Styles & FS helpers (ground truth) */
 import { colors, S } from '../../src/styles';
 import {
-  DOC_ROOT, CACHE_ROOT, ensureDir, bytes, copyDirRecursive
+  DOC_ROOT, CACHE_ROOT, ensureDir, bytes, copyDirRecursive, writeJson
 } from '../../src/fs';
-import { PASSPORT, ATT_DIR } from '../../src/passportStore';
+import { PASSPORT, ATT_DIR, INDEX, buildDemoPassport, buildEmptyIndex } from '../../src/passportStore';
 
 /* AWS S3 (direct IAM creds via env) */
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -64,6 +64,7 @@ function makeS3Client() {
     credentials: { accessKeyId, secretAccessKey } as any,
   });
 }
+
 function base64ToUint8Array(b64: string) {
   const binary = atob(b64);
   const len = binary.length;
@@ -92,49 +93,47 @@ export default function Home() {
   const hasCamPerm = perm?.granted ?? null;
   useEffect(() => { if (!perm) requestPermission(); }, [perm, requestPermission]);
 
-  // ---- ZIP (parallel to admin.zipRun) ----
-  const zipRun = useCallback(async () => {
-    // Assumption per spec: everything is up-to-date; no seeding here.
+  // ---- Ensure files exist (exactly like admin initStage) ----
+  const ensureFilesExist = useCallback(async () => {
+    setStep(`INIT (ensuring files exist)`);
+    await ensureDir(ATT_DIR);
+    const pInfo = await FileSystem.getInfoAsync(PASSPORT);
+    const iInfo = await FileSystem.getInfoAsync(INDEX);
+    if (!pInfo.exists) await writeJson(PASSPORT, buildDemoPassport(runId));
+    if (!iInfo.exists) await writeJson(INDEX, buildEmptyIndex(runId));
+    setStep('Seeded passport.json + attachments/index.json');
+  }, [runId, setStep]);
+
+  // ---- Create ZIP and return path directly ----
+  const createZipAndReturnPath = useCallback(async (): Promise<string> => {
     const out = `${CACHE_ROOT}${runId}.zip`;
     const staging = `${CACHE_ROOT}bundle_${runId}/`;
 
-    // Clean staging if present
     const stInfo = await FileSystem.getInfoAsync(staging);
     if (stInfo.exists) await FileSystem.deleteAsync(staging, { idempotent: true });
     await ensureDir(staging);
 
-    // Copy current passport + attachments exactly
     await FileSystem.copyAsync({ from: PASSPORT, to: `${staging}passport.json` });
     await copyDirRecursive(ATT_DIR, `${staging}attachments/`);
 
     setStep(`Zipping ${staging} → ${out}`);
     await zip(staging, out);
     const info = await FileSystem.getInfoAsync(out, { size: true });
-    setZipPath(out);
+    setZipPath(out); // Still update state for UI display
     setStep(`ZIP ready: ${out} (${bytes(info.size)})`);
 
-    // Cleanup staging
     await FileSystem.deleteAsync(staging, { idempotent: true });
-  }, [runId]);
+    return out; // Return the path directly
+  }, [runId, setStep]);
 
-  // ---- Upload (parallel to admin.uploadZip) ----
-  const uploadZip = useCallback(async () => {
+  // ---- Upload with explicit path ----
+  const uploadZipWithPath = useCallback(async (zipPath: string, sessionId: string, address: string) => {
     try {
-      if (!zipPath) {
-        Alert.alert('No ZIP', 'Create a ZIP first.');
-        return;
-      }
-      if (!sessionId || !sessionId.trim()) {
-        Alert.alert('Missing Session ID', 'Scan a QR code with a sessionId first.');
-        return;
-      }
-
       const bucket = (process.env.BUCKET as string) || 'caladrius-buffer';
 
       const stat = await FileSystem.getInfoAsync(zipPath, { size: true });
       if (!stat.exists) {
-        Alert.alert('File missing', 'ZIP file not found on device.');
-        return;
+        throw new Error('ZIP file not found on device.');
       }
       const b64 = await FileSystem.readAsStringAsync(zipPath, { encoding: FileSystem.EncodingType.Base64 });
       const bodyBytes = base64ToUint8Array(b64);
@@ -176,7 +175,7 @@ export default function Home() {
       }));
       setStep('Manifest uploaded');
 
-      // >>> TRIAGE COMPLETE NOTIFY (same as admin) <<<
+      // >>> TRIAGE COMPLETE NOTIFY <<<
       if (address && sessionId) {
         try {
           await postJSON(address, '/api/triage/complete', { sessionId });
@@ -191,134 +190,44 @@ export default function Home() {
       setStep(`Upload error: ${e?.message || String(e)}`);
       Alert.alert('Upload error', e?.message || String(e));
     }
-  }, [zipPath, sessionId, address]);
+  }, [setStep]);
 
-  // ---- QR scan handler (parallel to admin.onScan + safe unmount) ----
-  // Replace the onScan callback in home.tsx with this version:
-
-    const onScan = useCallback(async ({ data }: { data: string }) => {
+  // ---- QR scan handler (fixed version) ----
+  const onScan = useCallback(async ({ data }: { data: string }) => {
     if (scanBusy) return;
     setScanBusy(true);
 
     try {
-        const obj = JSON.parse(data);
-        const sid = typeof obj?.sessionId === 'string' ? obj.sessionId : '';
-        const addr = typeof obj?.address === 'string' ? obj.address : '';
-        if (!sid || !addr) throw new Error('QR JSON missing sessionId/address');
+      const obj = JSON.parse(data);
+      const sid = typeof obj?.sessionId === 'string' ? obj.sessionId : '';
+      const addr = typeof obj?.address === 'string' ? obj.address : '';
+      if (!sid || !addr) throw new Error('QR JSON missing sessionId/address');
 
-        setSessionId(sid);
-        setAddress(addr);
-        setStep(`QR parsed → sessionId=${sid} address=${addr}`);
+      setSessionId(sid);
+      setAddress(addr);
+      setStep(`QR parsed → sessionId=${sid} address=${addr}`);
 
-        // >>> TRIAGE CONNECT NOTIFY <<<
-        try {
+      // >>> TRIAGE CONNECT NOTIFY <<<
+      try {
         await postJSON(addr, '/api/triage/connect', { sessionId: sid });
         setStep('Notified server: /api/triage/connect');
-        } catch (err: any) {
+      } catch (err: any) {
         setStep(`Notify /api/triage/connect failed: ${err?.message || String(err)}`);
-        }
+      }
 
-        setTimeout(() => setScanOpen(false), 200);
+      setTimeout(() => setScanOpen(false), 200);
 
-        // FIXED: Create zip and get the path, then pass it directly to upload
-        const zipPath = await createZipAndReturnPath();
-        await uploadZipWithPath(zipPath, sid, addr);
+      // FIXED: Create zip and get the path, then pass it directly to upload
+      const zipPath = await createZipAndReturnPath();
+      await uploadZipWithPath(zipPath, sid, addr);
     } catch (e: any) {
-        setStep(`QR parse error: ${e?.message || String(e)}`);
-        Alert.alert('QR Error', 'Expecting JSON with { "sessionId", "address" }.');
-        setTimeout(() => setScanOpen(false), 200);
+      setStep(`QR parse error: ${e?.message || String(e)}`);
+      Alert.alert('QR Error', 'Expecting JSON with { "sessionId", "address" }.');
+      setTimeout(() => setScanOpen(false), 200);
     } finally {
-        setScanBusy(false);
+      setScanBusy(false);
     }
-    }, [scanBusy]);
-
-    // Add these two new functions to replace zipRun and uploadZip:
-
-    const createZipAndReturnPath = useCallback(async (): Promise<string> => {
-    const out = `${CACHE_ROOT}${runId}.zip`;
-    const staging = `${CACHE_ROOT}bundle_${runId}/`;
-
-    const stInfo = await FileSystem.getInfoAsync(staging);
-    if (stInfo.exists) await FileSystem.deleteAsync(staging, { idempotent: true });
-    await ensureDir(staging);
-
-    await FileSystem.copyAsync({ from: PASSPORT, to: `${staging}passport.json` });
-    await copyDirRecursive(ATT_DIR, `${staging}attachments/`);
-
-    setStep(`Zipping ${staging} → ${out}`);
-    await zip(staging, out);
-    const info = await FileSystem.getInfoAsync(out, { size: true });
-    setZipPath(out); // Still update state for UI display
-    setStep(`ZIP ready: ${out} (${bytes(info.size)})`);
-
-    await FileSystem.deleteAsync(staging, { idempotent: true });
-    return out; // Return the path directly
-    }, [runId]);
-
-    const uploadZipWithPath = useCallback(async (zipPath: string, sessionId: string, address: string) => {
-    try {
-        const bucket = (process.env.BUCKET as string) || 'caladrius-buffer';
-
-        const stat = await FileSystem.getInfoAsync(zipPath, { size: true });
-        if (!stat.exists) {
-        throw new Error('ZIP file not found on device.');
-        }
-        const b64 = await FileSystem.readAsStringAsync(zipPath, { encoding: FileSystem.EncodingType.Base64 });
-        const bodyBytes = base64ToUint8Array(b64);
-
-        const s3 = makeS3Client();
-        const keyBundle = `runs/${sessionId}/bundle.zip`;
-        const keyManifest = `runs/${sessionId}/manifest.json`;
-
-        setStep(`Uploading bundle → s3://${bucket}/${keyBundle} (${bytes(stat.size)})`);
-        await s3.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: keyBundle,
-        Body: bodyBytes,
-        ContentType: 'application/zip',
-        Metadata: {
-            'x-session-id': sessionId,
-            'x-app': 'caladrius',
-        },
-        }));
-        setStep('Bundle uploaded');
-
-        const manifest = {
-        sessionId,
-        uploadedAt: new Date().toISOString(),
-        bundle: {
-            key: keyBundle,
-            size: stat.size,
-            contentType: 'application/zip',
-        },
-        app: { name: 'caladrius', version: '1.0' },
-        };
-
-        setStep(`Uploading manifest → s3://${bucket}/${keyManifest}`);
-        await s3.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: keyManifest,
-        Body: JSON.stringify(manifest, null, 2),
-        ContentType: 'application/json',
-        }));
-        setStep('Manifest uploaded');
-
-        // >>> TRIAGE COMPLETE NOTIFY <<<
-        if (address && sessionId) {
-        try {
-            await postJSON(address, '/api/triage/complete', { sessionId });
-            setStep('Notified server: /api/triage/complete');
-        } catch (err: any) {
-            setStep(`Notify /api/triage/complete failed: ${err?.message || String(err)}`);
-        }
-        }
-
-        Alert.alert('Upload complete', `s3://${bucket}/runs/${sessionId}/`);
-    } catch (e: any) {
-        setStep(`Upload error: ${e?.message || String(e)}`);
-        Alert.alert('Upload error', e?.message || String(e));
-    }
-    }, []);
+  }, [scanBusy, createZipAndReturnPath, uploadZipWithPath, setStep]);
 
   // ===================== UI (restricted) =====================
   return (
@@ -328,7 +237,13 @@ export default function Home() {
       {/* Single CTA */}
       <View style={S.card}>
         <Text style={S.h2}>Send Data</Text>
-        <TouchableOpacity style={S.btn(colors.accent)} onPress={() => setScanOpen(true)}>
+        <TouchableOpacity 
+          style={S.btn(colors.accent)} 
+          onPress={async () => {
+            await ensureFilesExist();
+            setScanOpen(true);
+          }}
+        >
           <Text style={S.btnText}>Scan QR code to send data</Text>
         </TouchableOpacity>
 
