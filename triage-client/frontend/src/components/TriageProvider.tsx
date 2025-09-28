@@ -25,6 +25,7 @@ interface Ctx {
   phase: TriagePhase;
   currentQuestion?: BackendQuestion;
   diagnosis?: DiagnosisResult;
+  confirmMessage?: string;
   patientData: PatientData;
   error?: string;
   busy: boolean;
@@ -44,6 +45,7 @@ interface Ctx {
   // Flow control methods
   startDiagnosis: (symptomsOverride?: string[]) => Promise<void>;
   answerQuestion: (answer: string) => Promise<void>;
+  confirmProceed: (confirm: boolean) => Promise<void>;
   reset: () => void;
 }
 
@@ -61,6 +63,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
   const [busy, setBusy] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState<BackendQuestion>();
   const [diagnosis, setDiagnosis] = useState<DiagnosisResult>();
+  const [confirmMessage, setConfirmMessage] = useState<string>();
   const [error, setError] = useState<string>();
   const [patientData, setPatientData] = useState<PatientData>({
     symptoms: [],
@@ -162,6 +165,9 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       if (response.type === 'question') {
         setCurrentQuestion(response);
         setPhase("prompt");
+      } else if (response.type === 'confirm') {
+        setCurrentQuestion(undefined);
+        setPhase("confirm");
       } else if (response.type === 'diagnosis') {
         setDiagnosis(response);
         setPhase("diagnosis");
@@ -188,9 +194,16 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       if (response.type === 'question') {
         setCurrentQuestion(response);
         setPhase("prompt");
+      } else if (response.type === 'confirm') {
+        // Transition to confirmation phase
+        setCurrentQuestion(undefined);
+        setDiagnosis(undefined);
+        setConfirmMessage(response.message);
+        setPhase("confirm");
       } else if (response.type === 'diagnosis') {
         setDiagnosis(response);
         setCurrentQuestion(undefined);
+        setConfirmMessage(undefined);
         setPhase("diagnosis");
       } else if (response.type === 'error') {
         setError(response.error);
@@ -204,6 +217,26 @@ export default function TriageProvider({ children }: { children: React.ReactNode
     }
   }, [sessionId, currentQuestion]);
 
+  // Confirm or cancel proceed-to-diagnosis
+  const confirmProceed = useCallback(async (confirm: boolean) => {
+    if (!sessionId) return;
+    // Optimistic UI: immediately mark completed on confirm, and clear confirm message
+    if (confirm) {
+      setConfirmMessage(undefined);
+      setPhase("completed");
+    }
+    setBusy(true);
+    try {
+      // Send confirm but intentionally ignore the response to avoid UI branching here
+      await medicalApi.confirmDiagnosis(sessionId, confirm);
+    } catch (err) {
+      // Intentionally ignore errors from confirm to avoid disrupting UI flow
+      // You can log if needed: console.error(err);
+    } finally {
+      setBusy(false);
+    }
+  }, [sessionId]);
+
   // Reset the entire triage process
   const reset = useCallback(() => {
     setSessionId(undefined);
@@ -211,6 +244,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
     setBusy(false);
     setCurrentQuestion(undefined);
     setDiagnosis(undefined);
+    setConfirmMessage(undefined);
     setError(undefined);
     setPatientData({ symptoms: [] });
   }, []);
@@ -221,6 +255,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       phase,
       currentQuestion,
       diagnosis,
+  confirmMessage,
       patientData,
       error,
       busy,
@@ -234,6 +269,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       canGoPrevious,
       startDiagnosis,
       answerQuestion,
+      confirmProceed,
       reset,
     }),
     [
@@ -241,6 +277,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       phase,
       currentQuestion,
       diagnosis,
+  confirmMessage,
       patientData,
       error,
       busy,
@@ -254,6 +291,7 @@ export default function TriageProvider({ children }: { children: React.ReactNode
       canGoPrevious,
       startDiagnosis,
       answerQuestion,
+      confirmProceed,
       reset,
     ]
   );

@@ -22,13 +22,20 @@ export type DiagnosisResult = {
   status: 'completed';
 };
 
+export type BackendConfirm = {
+  type: 'confirm';
+  action: string; // "confirm_diagnosis_complete"
+  message: string;
+  status: 'awaiting_confirmation';
+};
+
 export type ApiError = {
   type: 'error';
   error: string;
   status: 'error';
 };
 
-export type ApiResponse = BackendQuestion | DiagnosisResult | ApiError;
+export type ApiResponse = BackendQuestion | BackendConfirm | DiagnosisResult | ApiError;
 
 // Unified patient data structure
 export type PatientData = {
@@ -44,5 +51,7 @@ export type TriagePhase =
   | "symptoms"   // Step 3: Symptoms input
   | "processing" // Sending data to backend and processing
   | "prompt"     // Waiting for user response to diagnostic question
+  | "confirm"    // Waiting for user confirmation to proceed to final diagnosis
   | "diagnosis"  // Final diagnosis received
+  | "completed"  // Flow complete; backend continues asynchronously
   | "error";     // Error occurred

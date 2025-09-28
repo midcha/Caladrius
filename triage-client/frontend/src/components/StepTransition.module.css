@@ -52,6 +52,7 @@
   background: rgba(240, 249, 255, 0.5);
   border-radius: 12px;
   backdrop-filter: blur(8px);
+  min-height: 80vh; /* larger viewport height for loading */
 }
 
 /* Content wrapper styling */

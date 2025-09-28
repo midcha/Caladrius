@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import styles from "./LoadingAnimation.module.css";
 
 interface LoadingAnimationProps {
@@ -49,24 +50,20 @@ export default function LoadingAnimation({
     }
   }, [messageIndex, showCalmingMessage, message]);
 
-  const getAnimationComponent = () => {
-    switch (variant) {
-      case "pulse":
-        return <PulseAnimation size={size} />;
-      case "spinner":
-        return <SpinnerAnimation size={size} />;
-      case "dots":
-        return <DotsAnimation size={size} />;
-      case "heartbeat":
-      default:
-        return <HeartbeatAnimation size={size} />;
-    }
-  };
+  // We render a spinner ring around the centered brand circle regardless of variant,
+  // to satisfy the design request of "loading around the circle".
+
+  const logoPx = size === 'small' ? 28 : size === 'large' ? 44 : 36;
+  const circleSizeClass = size === 'small' ? styles.brandCircleSmall : size === 'large' ? styles.brandCircleLarge : styles.brandCircleMedium;
+  const ringSizeClass = size === 'small' ? styles.brandRingSmall : size === 'large' ? styles.brandRingLarge : styles.brandRingMedium;
 
   return (
     <div className={`${styles.container} ${styles[size]}`}>
-      <div className={styles.animationWrapper}>
-        {getAnimationComponent()}
+      <div className={styles.centerWrap}>
+        <div className={`${styles.brandCircle} ${circleSizeClass}`}>
+          <Image src="/caladrius.png" alt="Caladrius" width={logoPx} height={logoPx} />
+        </div>
+        <div className={`${styles.brandRing} ${ringSizeClass}`} />
       </div>
       {(showCalmingMessage || message) && (
         <p className={`${styles.message} ${styles.fadeIn}`}>
@@ -76,46 +73,4 @@ export default function LoadingAnimation({
     </div>
   );
 }
-
-function HeartbeatAnimation({ size }: { size: string }) {
-  return (
-    <div className={`${styles.heartbeat} ${styles[size]}`}>
-      <div className={styles.heartbeatInner}>
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-            fill="currentColor"
-          />
-        </svg>
-      </div>
-    </div>
-  );
-}
-
-function PulseAnimation({ size }: { size: string }) {
-  return (
-    <div className={`${styles.pulse} ${styles[size]}`}>
-      <div className={styles.pulseRing}></div>
-      <div className={styles.pulseRing}></div>
-      <div className={styles.pulseRing}></div>
-    </div>
-  );
-}
-
-function SpinnerAnimation({ size }: { size: string }) {
-  return (
-    <div className={`${styles.spinner} ${styles[size]}`}>
-      <div className={styles.spinnerInner}></div>
-    </div>
-  );
-}
-
-function DotsAnimation({ size }: { size: string }) {
-  return (
-    <div className={`${styles.dots} ${styles[size]}`}>
-      <div className={styles.dot}></div>
-      <div className={styles.dot}></div>
-      <div className={styles.dot}></div>
-    </div>
-  );
-}
+// Removed standalone variant animations in favor of a unified ring around the logo

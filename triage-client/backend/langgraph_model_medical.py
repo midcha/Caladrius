@@ -1,5 +1,5 @@
 import os
-from typing import Optional, TypedDict, Annotated, Union, Dict, Any
+from typing import Optional, TypedDict, Annotated
 
 import dotenv
 from langgraph.graph import StateGraph, END, add_messages
@@ -9,7 +9,7 @@ from langchain_core.tools import tool
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 
-from tools import ask_user_for_input, query_medical_history
+# tool imports are consolidated below
 
 # For debugging and visualization
 import json
@@ -20,7 +20,7 @@ dotenv.load_dotenv()
 
 class State(TypedDict, total=False):
     symptoms: list[str]
-    medical_records: Optional[Union[str, Dict[str, Any]]]
+    medical_records: Optional[str]
     questions_asked: list[str]
     responses: list[str]
     diagnosis: Optional[str]
@@ -42,7 +42,8 @@ def log_step(step_name: str, state: State, extra_info: str = ""):
 
 
 # Register available tools for medical diagnosis
-tools = [ask_user_for_input, query_medical_history]
+from tools import ask_user_for_input, signal_diagnosis_complete
+tools = [ask_user_for_input, signal_diagnosis_complete]
 # Note: We handle tool execution manually below to support interrupt-based flows.
 
 
@@ -62,10 +63,11 @@ def agent_node(state: State):
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         temperature=0,
         reasoning={"effort": "low"},
-    ).bind_tools(tools)
+    ).bind_tools(tools, tool_choice="required")
     
     # Build the diagnostic context
     symptoms_str = ", ".join(symptoms) if symptoms else "No symptoms provided"
+    medical_context = f"Medical Records: {medical_records or 'No medical history provided'}"
     questions_context = f"Previous Questions Asked: {len(questions_asked)}"
     
     # Analyze what areas have been covered based on previous questions
@@ -106,13 +108,14 @@ def agent_node(state: State):
     coverage_guidance += "NEXT QUESTION PRIORITY: Ask about one of the missing areas above."
     
     # Determine if we should ask more questions or proceed to diagnosis
-    max_questions = 3  # Allow for more thorough information gathering
+    max_questions = 2  # Allow for more thorough information gathering
     should_continue_questioning = len(questions_asked) < max_questions
     
     messages = [
         SystemMessage(content=(
             "You are a medical assistant gathering information for diagnosis. Ask ONE clear question at a time.\n\n"
             f"Patient symptoms: {symptoms_str}\n"
+            f"{medical_context}\n"
             f"{questions_context}\n"
             f"{coverage_guidance}\n\n"
             "Essential areas to cover:\n"
@@ -128,12 +131,12 @@ def agent_node(state: State):
             "• Use simple, everyday language\n"
             "• One focused question at a time\n"
             "• Be direct but caring\n"
-            "• Ask at least 5 questions before diagnosis\n"
+            "• Ask at least 2 questions before diagnosis\n"
             "• Focus on missing areas from the list above\n\n"
-            "Actions:\n"
+            "Actions (MANDATORY):\n"
+            "• You MUST either ask a question or call a tool; never produce a final diagnosis directly from this node.\n"
             "• Need more info: use ask_user_for_input tool\n"
-            "• Query patient's medical records: use query_medical_history tool\n"
-            "• Have enough info (5+ questions, key areas covered): respond 'READY_FOR_DIAGNOSIS'\n"
+            "• Have enough info (2+ questions asked AND most areas covered): use signal_diagnosis_complete tool\n"
         )),
         HumanMessage(content=f"Patient presents with: {symptoms_str}")
     ]
@@ -150,12 +153,12 @@ def agent_node(state: State):
     response = model.invoke(messages)
     
     # Check if model chose to use tools
-    if response.tool_calls and should_continue_questioning:
+    if response.tool_calls:
         for tool_call in response.tool_calls:
             tool_name = tool_call["name"]
             tool_args = tool_call.get("args", {}) or {}
 
-            if tool_name == "ask_user_for_input":
+            if tool_name == "ask_user_for_input" and should_continue_questioning:
                 # Store the question being asked
                 question = tool_args.get("query", "Please provide more information")
                 updated_questions = questions_asked + [question]
@@ -170,48 +173,52 @@ def agent_node(state: State):
                 # Update state and return the interrupt
                 return ask_user_for_input.invoke(params)
             
-            elif tool_name == "query_medical_history":
-                # Query medical history records
-                medical_records = state.get('medical_records')
-                field_path = tool_args.get("field_path", "")
-                criteria = tool_args.get("specific_criteria")
-                
-                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] MEDICAL HISTORY QUERY (Agent Node)")
-                print(f"   Field Path: {field_path}")
-                print(f"   Criteria: {criteria or 'None'}")
-                print(f"   Has Records: {'Yes' if medical_records else 'No'}")
-                
-                if not medical_records:
-                    result = "No medical records available for this patient."
-                    print(f"   Result: {result}")
-                else:
-                    result = query_medical_history.invoke({
-                        "medical_records": medical_records,
-                        "field_path": field_path,
-                        "specific_criteria": criteria
-                    })
-                    print(f"   Result: {result[:100]}{'...' if len(result) > 100 else ''}")
-                
-                print("-" * 60)
-                
-                # Add the query result to messages for context
-                query_message = AIMessage(content=f"Medical history query result: {result}")
-                return Command(update={"messages": [query_message]}, goto="agent")
+            elif tool_name == "signal_diagnosis_complete":
+                # Only honor completion if we've met our questioning threshold
+                if not should_continue_questioning:
+                    return signal_diagnosis_complete.invoke({})
+                # Otherwise, redirect to asking one more targeted question
+                follow_up = "Can you share a bit more detail?"
+                try:
+                    # Ask about one of the identified missing areas
+                    if missing_areas:
+                        area = missing_areas[0]
+                        prompts = {
+                            "quality": "How would you describe the pain/symptom?",
+                            "triggers": "What makes it better or worse?",
+                            "associated_symptoms": "Any other symptoms with this?",
+                            "context": "What were you doing when it started?",
+                            "history": "Have you had this before or take meds?",
+                        }
+                        follow_up = prompts.get(area, follow_up)
+                except Exception:
+                    pass
+                return ask_user_for_input.invoke({
+                    "query": follow_up,
+                    "question_type": "open_ended",
+                })
     
-    # No tool calls - proceed to diagnosis only if we have enough information
-    return Command(goto="final_output")
+    # No tool calls should not happen with tool_choice="required", but guard anyway
+    if not should_continue_questioning:
+        # If we've reached our question limit, explicitly trigger the confirm tool
+        return signal_diagnosis_complete.invoke({})
+    # Fallback: ask a generic open-ended question to avoid accidental finalization
+    return ask_user_for_input.invoke({
+        "query": "Is there anything else I should know?",
+        "question_type": "open_ended"
+    })
 
 
 def final_output_node(state: State):
     """Generate final medical diagnosis with top 5 possible causes."""
     log_step("FINAL_OUTPUT_NODE", state, "Generating differential diagnosis")
     
-    # Initialize ChatOpenAI with tools
+    # Initialize ChatOpenAI
     model = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.3")),  # Lower temp for medical accuracy
         reasoning={"effort": "medium"},
-    ).bind_tools([query_medical_history])
+    )
     
     # Extract medical context from state
     symptoms = state.get('symptoms', [])
@@ -221,6 +228,7 @@ def final_output_node(state: State):
     
     # Build comprehensive medical context
     symptoms_str = ", ".join(symptoms) if symptoms else "No symptoms provided"
+    medical_context = medical_records or "No medical history provided"
     
     # Create Q&A summary
     qa_summary = ""
@@ -234,16 +242,8 @@ def final_output_node(state: State):
     messages = [
         SystemMessage(content=(
             "You are an experienced physician providing a differential diagnosis. "
-            "BEFORE generating your diagnosis, you MUST query the patient's medical history for relevant information.\n\n"
-            "REQUIRED FIRST STEP: Use the query_medical_history tool to gather relevant background information:\n"
-            "- Query allergies: 'medicalHistory.allergies'\n"
-            "- Query current medications: 'medicalHistory.prescriptions'\n"
-            "- Query family history: 'medicalHistory.familyHistory'\n"
-            "- Query recent labs: 'medicalHistory.labs'\n"
-            "- Query imaging studies: 'medicalHistory.imaging'\n"
-            "- Query past medical encounters: 'medicalHistory.encounters'\n"
-            "- Query demographics: 'sex', 'ethnicity', 'bloodType'\n\n"
-            "After gathering medical history, provide your TOP 5 MOST LIKELY diagnoses.\n\n"
+            "Based on the patient's symptoms, medical history, and answers to clarifying questions, "
+            "provide your TOP 5 MOST LIKELY diagnoses.\n\n"
             "RESPOND ONLY WITH A VALID JSON OBJECT in this exact format:\n"
             "{\n"
             "  \"differential_diagnosis\": [\n"
@@ -251,7 +251,7 @@ def final_output_node(state: State):
             "      \"rank\": 1,\n"
             "      \"diagnosis\": \"Condition Name\",\n"
             "      \"probability_percent\": 45,\n"
-            "      \"reasoning\": \"Brief clinical reasoning including relevant medical history\",\n"
+            "      \"reasoning\": \"Brief clinical reasoning\",\n"
             "      \"key_features\": [\"symptom1\", \"finding2\"],\n"
             "      \"next_steps\": [\"test1\", \"treatment2\"]\n"
             "    }\n"
@@ -265,9 +265,7 @@ def final_output_node(state: State):
             "Include 'urgency_level_text' as a human-readable label matching the numeric level.\n\n"
             "Consider:\n"
             "- Most common conditions first (common things are common)\n"
-            "- Age, gender, and risk factors from medical history\n"
-            "- Allergies and current medications from medical history\n"
-            "- Past medical encounters and family history\n"
+            "- Age, gender, and risk factors\n"
             "- Red flags requiring immediate attention\n"
             "- Pattern recognition from symptom clusters\n"
             "- Temporal relationships and triggers\n"
@@ -276,6 +274,7 @@ def final_output_node(state: State):
         HumanMessage(content=f"""
 PATIENT PRESENTATION:
 Symptoms: {symptoms_str}
+Medical History: {medical_context}
 
 CLINICAL INTERVIEW:
 {qa_summary if qa_summary else "No additional questions were asked."}
@@ -286,49 +285,6 @@ Please provide your differential diagnosis with the top 5 most likely conditions
 
     # Call the model for diagnosis
     response = model.invoke(messages)
-    
-    # Handle tool calls for medical history queries
-    if response.tool_calls:
-        # Process medical history queries first
-        medical_history_context = []
-        
-        for tool_call in response.tool_calls:
-            tool_name = tool_call["name"]
-            tool_args = tool_call.get("args", {}) or {}
-            
-            if tool_name == "query_medical_history":
-                field_path = tool_args.get("field_path", "")
-                criteria = tool_args.get("specific_criteria")
-                
-                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] MEDICAL HISTORY QUERY (Final Output Node)")
-                print(f"   Field Path: {field_path}")
-                print(f"   Criteria: {criteria or 'None'}")
-                print(f"   Has Records: {'Yes' if medical_records else 'No'}")
-                
-                if medical_records:
-                    result = query_medical_history.invoke({
-                        "medical_records": medical_records,
-                        "field_path": field_path,
-                        "specific_criteria": criteria
-                    })
-                    print(f"   Result: {result[:100]}{'...' if len(result) > 100 else ''}")
-                    medical_history_context.append(f"{field_path}: {result}")
-                else:
-                    print(f"   Result: No medical records available")
-                    medical_history_context.append(f"{field_path}: No medical records available")
-                
-                print("-" * 60)
-        
-        # Add medical history context and call model again for final diagnosis
-        if medical_history_context:
-            history_summary = "\n".join(medical_history_context)
-            print(f"\n[{datetime.now().strftime('%H:%M:%S')}] ADDING MEDICAL HISTORY TO DIAGNOSIS")
-            print(f"   Queries Completed: {len(medical_history_context)}")
-            print(f"   Context Length: {len(history_summary)} characters")
-            print("-" * 60)
-            
-            messages.append(HumanMessage(content=f"\nMEDICAL HISTORY QUERY RESULTS:\n{history_summary}\n\nNow provide your differential diagnosis based on all available information."))
-            response = model.invoke(messages)
 
     # Extract text content: some providers return structured content blocks
     raw_content = getattr(response, "content", None)
@@ -450,12 +406,26 @@ def main():
     # Medical diagnostic interview loop
     while isinstance(result, dict) and "__interrupt__" in result:
         payload = result["__interrupt__"][0].value
+        # Two interrupt modes:
+        # 1) Question flow from ask_user_for_input
+        # 2) Confirmation from signal_diagnosis_complete
+
+        if payload.get("action") == "confirm_diagnosis_complete":
+            # Simple yes/no style confirmation in CLI; default to 'n' on empty
+            prompt = payload.get("message", "Proceed to diagnosis? (y/N)")
+            user_value = input(f"\n{prompt} ").strip() or "n"
+
+            # Resume without altering Q/A lists
+            result = app.invoke(Command(resume=user_value), config=config)
+            continue
+
+        # Default: question flow
         query = payload.get("query", "Please provide more information")
         options = payload.get("options")
         question_type = payload.get("question_type", "multiple_choice")
-        
+
         print(f"\nTriage Assistant asks: {query}")
-        
+
         if question_type == "open_ended":
             print("   (Please describe in your own words)")
             user_value = input(f"\n Patient response: ").strip()
@@ -480,9 +450,9 @@ def main():
                             print(f"     {i}. {option}")
                 except Exception:
                     print("   Medical options provided.")
-            
+
             user_value = input(f"\n Patient response (choose number or describe): ").strip()
-            
+
             # Handle numeric selection for multiple choice
             if user_value.isdigit() and options:
                 try:
@@ -493,7 +463,7 @@ def main():
                         user_value = options[idx]
                 except (IndexError, ValueError):
                     pass  # Keep original input if invalid selection
-            
+
             if not user_value and options:
                 # Default to first option if provided
                 try:
@@ -505,9 +475,9 @@ def main():
                     user_value = "Unknown"
             elif not user_value:
                 user_value = "No additional information provided"
-            
+
         print(f"   Response recorded: {user_value}")
-        
+
         # Update the responses and questions_asked in state and resume
         current_state = app.get_state(config)
         current_responses = current_state.values.get('responses', [])
