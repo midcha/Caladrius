@@ -70,6 +70,23 @@ def agent_node(state: State):
     medical_context = f"Medical Records: {medical_records or 'No medical history provided'}"
     questions_context = f"Previous Questions Asked: {len(questions_asked)}"
     
+    # Analyze existing medical records for targeted questioning
+    has_substantial_history = medical_records and medical_records.lower() not in ["no medical history provided", "no significant medical history", ""]
+    
+    # Extract key elements from medical history if available
+    history_indicators = {
+        "conditions": ["diabetes", "hypertension", "heart", "asthma", "copd", "arthritis", "depression", "anxiety", "cancer", "kidney", "liver"],
+        "medications": ["medication", "taking", "prescribed", "pills", "injection", "insulin", "blood pressure", "pain medication"],
+        "allergies": ["allergic", "allergy", "reaction", "sensitive", "intolerant"],
+        "past_episodes": ["history of", "previous", "similar", "before", "recurring", "chronic"]
+    }
+    
+    medical_context_flags = {}
+    if has_substantial_history:
+        history_lower = medical_records.lower()
+        for category, keywords in history_indicators.items():
+            medical_context_flags[category] = any(keyword in history_lower for keyword in keywords)
+    
     # Analyze what areas have been covered based on previous questions
     covered_areas = []
     timing_questions = ["when", "started", "how long", "duration", "time"]
@@ -78,7 +95,7 @@ def agent_node(state: State):
     trigger_questions = ["better", "worse", "trigger", "cause", "aggravate", "relieve"]
     associated_questions = ["other symptoms", "anything else", "along with", "together"]
     context_questions = ["doing when", "started when", "recent", "changes", "circumstances"]
-    history_questions = ["before", "family", "medication", "medical history", "past"]
+    history_correlation_questions = ["relate", "connection", "similar", "medication", "condition", "before"]
     
     all_questions_text = " ".join(questions_asked).lower()
     
@@ -94,49 +111,93 @@ def agent_node(state: State):
         covered_areas.append("associated_symptoms")
     if any(word in all_questions_text for word in context_questions):
         covered_areas.append("context")
-    if any(word in all_questions_text for word in history_questions):
-        covered_areas.append("history")
+    if any(word in all_questions_text for word in history_correlation_questions):
+        covered_areas.append("history_correlation")
+    
+    # Balanced priority areas focusing equally on symptoms and medical history
+    if has_substantial_history:
+        # When medical history is available, balance symptom assessment with history correlation
+        priority_areas = ["severity", "history_correlation", "quality", "triggers", "associated_symptoms", "timing", "context"]
+    else:
+        # When minimal history, focus on symptom assessment with basic history gathering
+        priority_areas = ["severity", "quality", "triggers", "associated_symptoms", "timing", "context", "basic_history"]
     
     missing_areas = []
-    all_areas = ["quality", "triggers", "associated_symptoms", "context", "history"]
-    for area in all_areas:
+    for area in priority_areas:
         if area not in covered_areas:
             missing_areas.append(area)
     
+    # Generate medical history-informed guidance
+    history_guidance = ""
+    if has_substantial_history:
+        history_guidance = f"MEDICAL HISTORY ANALYSIS:\n"
+        for category, present in medical_context_flags.items():
+            if present:
+                history_guidance += f"• {category.title()} documented - use for targeted questions\n"
+        history_guidance += "\n"
+    
     coverage_guidance = f"Areas covered: {', '.join(covered_areas) if covered_areas else 'None'}\n"
-    coverage_guidance += f"MISSING CRITICAL AREAS: {', '.join(missing_areas) if missing_areas else 'All covered'}\n"
-    coverage_guidance += "NEXT QUESTION PRIORITY: Ask about one of the missing areas above."
+    coverage_guidance += f"PRIORITY AREAS TO EXPLORE: {', '.join(missing_areas) if missing_areas else 'All key areas covered'}\n"
+    if has_substantial_history:
+        coverage_guidance += "STRATEGY: Balance symptom assessment with medical history analysis for comprehensive triage.\n"
+    else:
+        coverage_guidance += "STRATEGY: Focus on symptom assessment while gathering essential medical context.\n"
+    coverage_guidance += history_guidance
     
     # Determine if we should ask more questions or proceed to diagnosis
-    max_questions = 6  # Allow for more thorough information gathering
-    should_continue_questioning = len(questions_asked) < max_questions
+    # Adjust questioning based on medical history availability
+    if has_substantial_history:
+        # With good medical history, fewer questions needed - focus on correlation and severity
+        max_questions = 4
+        min_questions_threshold = 2
+    else:
+        # Without substantial history, need more questions for safety
+        max_questions = 6
+        min_questions_threshold = 3
+        
+    # Balanced completion criteria requiring both symptom and history assessment
+    has_minimum_info = len(questions_asked) >= min_questions_threshold
+    has_symptom_assessment = "severity" in covered_areas or "quality" in covered_areas
+    has_history_assessment = "history_correlation" in covered_areas or not has_substantial_history
+    has_balanced_coverage = has_symptom_assessment and has_history_assessment
+    
+    should_continue_questioning = (
+        len(questions_asked) < max_questions and 
+        (not has_minimum_info or not has_balanced_coverage)
+    )
     
     messages = [
         SystemMessage(content=(
-            "You are a medical assistant gathering information for diagnosis. Ask ONE clear question at a time.\n\n"
-            f"Patient symptoms: {symptoms_str}\n"
-            f"{medical_context}\n"
+            "You are a HOSPITAL TRIAGE NURSE gathering information for emergency prioritization. The patient is ALREADY IN THE HOSPITAL seeking care. Ask ONE clear question at a time.\n\n"
+            "TRIAGE CONTEXT: This patient has presented to the emergency department and needs immediate assessment for care priority.\n\n"
+            f"PRESENTING SYMPTOMS: {symptoms_str}\n"
+            f"MEDICAL HISTORY: {medical_context}\n"
             f"{questions_context}\n"
             f"{coverage_guidance}\n\n"
-            "Essential areas to cover:\n"
-            "• Timing: When started? Duration? Pattern?\n"
-            "• Quality: How does it feel?\n"
-            "• Triggers: What makes it better/worse?\n"
-            "• Other symptoms: Anything else happening?\n"
-            "• Context: What were you doing when it started?\n"
-            "• Medical history: Had this before? Medications?\n\n"
-            f"Progress: {len(questions_asked)}/{max_questions} questions asked\n\n"
-            "Guidelines:\n"
-            "• Keep questions SHORT (max 8-10 words)\n"
-            "• Use simple, everyday language\n"
+            "🩺 BALANCED TRIAGE ASSESSMENT PRIORITY:\n"
+            "• SYMPTOM ANALYSIS: Thoroughly assess current symptoms (severity, quality, timing, triggers)\n"
+            "• HISTORY CORRELATION: Connect current symptoms to documented medical history when available\n"
+            "• EQUAL FOCUS: Give equal weight to current presentation and relevant medical background\n"
+            "• COMPREHENSIVE VIEW: Integrate both new symptoms and existing conditions for complete triage\n\n"
+            "Essential triage assessment areas (balanced approach):\n"
+            "• SEVERITY & ACUITY: How severe? Getting worse? Life-threatening signs? (HIGHEST PRIORITY)\n"
+            "• MEDICAL HISTORY CORRELATION: How do current symptoms relate to known conditions/medications?\n"
+            "• TIMING: When started? Sudden or gradual onset? Duration?\n"
+            "• QUALITY: Character of symptoms (sharp, dull, cramping, etc.)\n"
+            "• TRIGGERS: What makes it better/worse? Activity-related?\n"
+            "• ASSOCIATED SYMPTOMS: Other concerning signs (fever, SOB, chest pain, etc.)\n\n"
+            f"Assessment Progress: {len(questions_asked)}/{max_questions} questions asked\n\n"
+            "TRIAGE COMMUNICATION GUIDELINES:\n"
+            "• Keep questions SHORT and URGENT (max 8-10 words)\n"
+            "• Use clear medical terminology when appropriate\n"
             "• One focused question at a time\n"
-            "• Be direct but caring\n"
-            "• Ask at least 2 questions before diagnosis\n"
-            "• Focus on missing areas from the list above\n\n"
+            "• Professional but compassionate tone\n"
+            "• Frame questions using patient's known medical context\n"
+            "• Focus on severity and time-sensitive factors\n\n"
             "Actions (MANDATORY):\n"
             "• You MUST either ask a question or call a tool; never produce a final diagnosis directly from this node.\n"
-            "• Need more info: use ask_user_for_input tool\n"
-            "• Have enough info (2+ questions asked AND most areas covered): use signal_diagnosis_complete tool\n"
+            "• Need more info for triage: use ask_user_for_input tool\n"
+            "• Have enough info (2+ questions asked AND most critical areas covered): use signal_diagnosis_complete tool\n"
         )),
         HumanMessage(content=f"Patient presents with: {symptoms_str}")
     ]
@@ -174,23 +235,74 @@ def agent_node(state: State):
                 return ask_user_for_input.invoke(params)
             
             elif tool_name == "signal_diagnosis_complete":
-                # Only honor completion if we've met our questioning threshold
-                if not should_continue_questioning:
+                # Enhanced completion logic considering balanced coverage
+                has_enough_for_diagnosis = (
+                    not should_continue_questioning or 
+                    (has_substantial_history and has_minimum_info and has_balanced_coverage)
+                )
+                
+                if has_enough_for_diagnosis:
                     return signal_diagnosis_complete.invoke({})
-                # Otherwise, redirect to asking one more targeted question
-                follow_up = "Can you share a bit more detail?"
+                    
+                # Generate targeted follow-up question based on medical history
+                follow_up = "Any other important details for triage?"
                 try:
-                    # Ask about one of the identified missing areas
-                    if missing_areas:
+                    if has_substantial_history and missing_areas:
                         area = missing_areas[0]
-                        prompts = {
-                            "quality": "How would you describe the pain/symptom?",
-                            "triggers": "What makes it better or worse?",
-                            "associated_symptoms": "Any other symptoms with this?",
-                            "context": "What were you doing when it started?",
-                            "history": "Have you had this before or take meds?",
+                        
+                        # Generate history-informed questions based on documented conditions
+                        def generate_history_correlation_question(med_records, symptom_list):
+                            """Generate a question that connects current symptoms to medical history."""
+                            history_lower = med_records.lower()
+                            symptoms_str = ", ".join(symptom_list).lower()
+                            
+                            # Detect common condition patterns and generate relevant questions
+                            if any(word in history_lower for word in ["diabetes", "diabetic"]):
+                                if any(word in symptoms_str for word in ["nausea", "vomit", "dizzy", "confusion"]):
+                                    return "Is your blood sugar normal today?"
+                                return "How are your blood sugar levels lately?"
+                            elif any(word in history_lower for word in ["hypertension", "blood pressure", "bp"]):
+                                if any(word in symptoms_str for word in ["headache", "dizzy", "chest"]):
+                                    return "Have you checked your blood pressure recently?"
+                                return "Are you taking your BP medication as usual?"
+                            elif any(word in history_lower for word in ["heart", "cardiac", "coronary"]):
+                                if any(word in symptoms_str for word in ["chest", "pain", "short", "breath"]):
+                                    return "Does this feel like your previous heart episodes?"
+                                return "How does this compare to your usual heart symptoms?"
+                            elif any(word in history_lower for word in ["asthma", "copd", "respiratory"]):
+                                if any(word in symptoms_str for word in ["breath", "cough", "wheez"]):
+                                    return "Did you use your rescue inhaler?"
+                                return "Is this similar to your usual breathing issues?"
+                            elif any(word in history_lower for word in ["medication", "taking", "prescribed"]):
+                                return "Any changes to your medications recently?"
+                            else:
+                                return "Does this relate to any of your known conditions?"
+                        
+                        history_informed_prompts = {
+                            "history_correlation": generate_history_correlation_question(medical_records, symptoms),
+                            "severity": "How severe is this compared to your usual symptoms?",
+                            "quality": "Does this feel different from your previous episodes?",
+                            "triggers": "Is this similar to what typically triggers your condition?",
+                            "associated_symptoms": "Any symptoms different from your usual pattern?",
+                            "timing": "When did this start compared to your medication schedule?",
+                            "context": "What were you doing when this started?"
                         }
-                        follow_up = prompts.get(area, follow_up)
+                        
+                        follow_up = history_informed_prompts.get(area, follow_up)
+                        
+                    elif missing_areas:
+                        # Standard questions when no substantial history
+                        area = missing_areas[0]
+                        standard_prompts = {
+                            "severity": "How severe is this symptom right now?",
+                            "quality": "Describe the exact character of this symptom?",
+                            "triggers": "What makes it better or worse?",
+                            "associated_symptoms": "Any other concerning symptoms?",
+                            "context": "What were you doing when this started?",
+                            "timing": "When exactly did this start?",
+                            "basic_history": "Any relevant medical conditions or medications?"
+                        }
+                        follow_up = standard_prompts.get(area, follow_up)
                 except Exception:
                     pass
                 return ask_user_for_input.invoke({
@@ -199,12 +311,29 @@ def agent_node(state: State):
                 })
     
     # No tool calls should not happen with tool_choice="required", but guard anyway
-    if not should_continue_questioning:
-        # If we've reached our question limit, explicitly trigger the confirm tool
+    # Use enhanced completion criteria
+    has_enough_for_diagnosis = (
+        not should_continue_questioning or 
+        (has_substantial_history and has_minimum_info and has_balanced_coverage)
+    )
+    
+    if has_enough_for_diagnosis:
         return signal_diagnosis_complete.invoke({})
-    # Fallback: ask a generic open-ended question to avoid accidental finalization
+        
+    # Fallback: ask a targeted question based on available medical history
+    if has_substantial_history and missing_areas:
+        area = missing_areas[0]
+        if area == "history_correlation":
+            fallback_question = "How does this relate to your known medical conditions?"
+        elif area == "severity":
+            fallback_question = "How severe is this compared to your usual symptoms?"
+        else:
+            fallback_question = "Is there anything else I should know?"
+    else:
+        fallback_question = "Any other important symptoms or details?"
+        
     return ask_user_for_input.invoke({
-        "query": "Is there anything else I should know?",
+        "query": fallback_question,
         "question_type": "open_ended"
     })
 
@@ -238,12 +367,23 @@ def final_output_node(state: State):
             qa_pairs.append(f"Q: {q}\nA: {a}")
         qa_summary = "\n\n".join(qa_pairs)
     
-    # Build diagnostic prompt
+    # Analyze medical history comprehensiveness
+    has_comprehensive_history = medical_records and len(medical_records) > 50 and medical_records.lower() not in [
+        "no medical history provided", "no significant medical history", "unremarkable", "none"
+    ]
+    
+    # Build diagnostic prompt with heavy medical history emphasis
     messages = [
         SystemMessage(content=(
-            "You are an experienced physician providing a differential diagnosis. "
-            "Based on the patient's symptoms, medical history, and answers to clarifying questions, "
-            "provide your TOP 5 MOST LIKELY diagnoses.\n\n"
+            "You are an EMERGENCY DEPARTMENT PHYSICIAN providing a TRIAGE-FOCUSED differential diagnosis. "
+            "This patient is ALREADY IN THE HOSPITAL and requires immediate priority assessment. "
+            "Based on the patient's symptoms, medical history, and triage interview, "
+            "provide your TOP 5 MOST LIKELY diagnoses with MEDICAL HISTORY as PRIMARY DIAGNOSTIC DRIVER.\n\n"
+            "BALANCED DIAGNOSTIC APPROACH:\n"
+            f"• Medical History Available: {'COMPREHENSIVE' if has_comprehensive_history else 'LIMITED'}\n"
+            "• SYMPTOM ANALYSIS: Thoroughly evaluate current presentation, severity, and acuity\n"
+            "• HISTORY INTEGRATION: Consider how symptoms relate to documented conditions\n"
+            "• EQUAL WEIGHTING: Balance current clinical picture with medical background\n\n"
             "RESPOND ONLY WITH A VALID JSON OBJECT in this exact format:\n"
             "{\n"
             "  \"differential_diagnosis\": [\n"
@@ -251,25 +391,36 @@ def final_output_node(state: State):
             "      \"rank\": 1,\n"
             "      \"diagnosis\": \"Condition Name\",\n"
             "      \"probability_percent\": 45,\n"
-            "      \"reasoning\": \"Brief clinical reasoning\",\n"
-            "      \"key_features\": [\"symptom1\", \"finding2\"],\n"
-            "      \"next_steps\": [\"test1\", \"treatment2\"]\n"
+            "      \"reasoning\": \"START with medical history analysis, then clinical reasoning\",\n"
+            "      \"key_features\": [\"symptom1\", \"history_connection1\", \"finding2\"],\n"
+            "      \"next_steps\": [\"history_guided_test1\", \"targeted_intervention2\"],\n"
+            "      \"medical_history_relevance\": \"DETAILED explanation of how patient's documented history supports this diagnosis\",\n"
+            "      \"history_confidence_score\": 85\n"
             "    }\n"
             "  ],\n"
-            "  \"clinical_summary\": \"Overall assessment and recommendations\",\n"
+            "  \"clinical_summary\": \"Balanced assessment integrating current symptoms with medical history\",\n"
             "  \"urgency_level\": 1,\n"
             "  \"urgency_level_text\": \"Emergency|High|Moderate|Low|Routine\",\n"
-            "  \"disclaimer\": \"This is for educational/research purposes only. Not a substitute for professional medical advice. Patient should consult healthcare provider for proper evaluation.\"\n"
+            "  \"symptom_analysis_impact\": \"Analysis of how current symptoms drive the diagnostic assessment\",\n"
+            "  \"medical_history_impact\": \"Analysis of how documented history informs the diagnostic assessment\",\n"
+            "  \"balanced_insights\": \"Key insights derived from integrating symptoms with medical background\",\n"
+            "  \"disclaimer\": \"This is a triage assessment tool utilizing comprehensive medical history analysis.\"\n"
             "}\n\n"
-            "IMPORTANT: Set 'urgency_level' as an INTEGER triage priority from 1 to 5 where 1=Emergency/Immediate, 2=High/Urgent, 3=Moderate, 4=Low, 5=Routine/Non-urgent.\n"
-            "Include 'urgency_level_text' as a human-readable label matching the numeric level.\n\n"
-            "Consider:\n"
-            "- Most common conditions first (common things are common)\n"
-            "- Age, gender, and risk factors\n"
-            "- Red flags requiring immediate attention\n"
-            "- Pattern recognition from symptom clusters\n"
-            "- Temporal relationships and triggers\n"
-            "- Atypical presentations and rare conditions that fit the clinical picture"
+            "🚨 BALANCED DIAGNOSTIC PRIORITIES:\n"
+            f"- WEIGHT FACTOR: {'50%' if has_comprehensive_history else '30%'} medical history, {'50%' if has_comprehensive_history else '70%'} current symptoms\n"
+            "- Prioritize conditions that are:\n"
+            "  1. COMPLICATIONS of existing conditions (highest priority)\n"
+            "  2. EXACERBATIONS of chronic diseases\n"
+            "  3. MEDICATION-RELATED adverse effects or interactions\n"
+            "  4. PROGRESSION of documented conditions\n"
+            "  5. NEW conditions in context of existing comorbidities\n\n"
+            "DIAGNOSTIC REASONING FRAMEWORK:\n"
+            "1. SYMPTOM ANALYSIS (CO-PRIMARY): Evaluate current presentation, severity, and clinical features\n"
+            "2. MEDICAL HISTORY INTEGRATION (CO-PRIMARY): Review documented conditions, medications, allergies\n"
+            "3. PATTERN CORRELATION: Compare current presentation to patient's historical patterns\n"
+            "4. RISK STRATIFICATION: Consider both acute symptoms and patient's comorbidity profile\n"
+            "5. COMPREHENSIVE ASSESSMENT: Balance current clinical picture with overall health context\n\n"
+            "⚡ MANDATORY: Every diagnosis MUST balance symptom analysis with medical history correlation, providing confidence scoring for both."
         )),
         HumanMessage(content=f"""
 PATIENT PRESENTATION:
@@ -392,7 +543,7 @@ def main():
             "headache",
             "mild nausea"
         ],
-        "medical_records": "28-year-old female, no significant medical history",
+        "medical_records": "28-year-old female with history of migraines, currently taking sumatriptan PRN and propranolol 40mg daily for migraine prevention. Previous episodes typically triggered by stress and lack of sleep, characterized by unilateral throbbing headache with nausea and light sensitivity. Last severe episode was 3 months ago.",
         "questions_asked": [],
         "responses": []
     }
